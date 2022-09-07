@@ -1,0 +1,15 @@
+*.log
+*.o
+customrc
+models
+*~
+*.so
+*.d
+*.x86_64
+*.class
+*.jar
+*.sw*
+pfd_infra_tools
+output
+__pycache__
+.pyc

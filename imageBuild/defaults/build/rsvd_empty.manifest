@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# (This is not actually an executable python script, instead a hint for text editors)
+
+{
+    'global': {
+        'end-marker': True,
+        'method': 'store',
+    },
+    'layout': {
+        'rsvd': {
+            'file': 'emptyfile',
+        },
+    },
+}
