@@ -103,11 +103,41 @@ def setupRepository(basePath, commit,remote):
         sys.exit(1)
 
     os.chdir(basePath)
-    resp = subprocess.run(["git","checkout",commit],stdout=subprocess.PIPE)
-    if resp.returncode != 0:
-        print("git checkout had returncode %d" % resp.returncode,file=sys.stderr)
-        os.chdir(cwd)
-        sys.exit(1)
+    if not args.nobranchchange:
+        resp = subprocess.run(["git","checkout",commit],stdout=subprocess.PIPE)
+        if resp.returncode != 0:
+            print("git checkout had returncode %d" % resp.returncode,file=sys.stderr)
+            os.chdir(cwd)
+            sys.exit(1)
+        if args.update:
+            if 'sbe' in remote:
+                cmd = 'git pull'
+                print(cmd)
+                resp = subprocess.run(cmd.split())
+                if resp.returncode != 0:
+                    print("git update failed with rc %d" % resp.returncode)
+                    os.chdir(cwd)
+                    sys.exit(1) 
+            elif 'ekb' in remote:
+                cmd = 'git fetch gerrit'
+                print(cmd)
+                resp = subprocess.run(cmd.split())
+                if resp.returncode != 0:
+                    print("git update failed with rc %d" % resp.returncode)
+                    os.chdir(cwd)
+                    sys.exit(1)
+                cmd = 'git rebase gerrit/%s' % (commit)
+                print(cmd)
+                resp = subprocess.run(cmd.split())
+                if resp.returncode != 0:
+                    print("git update failed with rc %d" % resp.returncode)
+                    os.chdir(cwd)
+                    sys.exit(1)
+            else:
+                print('Unknown remote: %s' % remote,file=sys.stderr)
+                os.chdir(cwd)
+                sys.exit(1)
+            
 
     if 'sbe' in remote:
         cmd='./sbe workon odyssey pnor'
@@ -117,6 +147,11 @@ def setupRepository(basePath, commit,remote):
     elif 'ekb' in remote:
         cmd='./ekb workon'
         build_cmd='rm -Rf ./output/*\n./ekb build\n'
+        if args.devready:
+            if not args.nobranchchange:
+                getDevReadyCommits(commit)
+            else:
+                print("Not getting dev-ready updates because --nobranchchange was specified")
     else:
         print('Unknown remote: %s' % remote,file=sys.stderr)
         os.chdir(cwd)
@@ -156,6 +191,35 @@ def addFiles(sectionName, sectionInfo):
     # create an empty file -
     return
 
+def getDevReadyCommits(commit):
+    print("\nRunning ./ekb cronus checkout")
+    out, err = subprocess.Popen(['source ./env.bash; ./ekb cronus checkout --branch', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()
+    # Sometimes seeing stuff in stderr that isn't actually an error, so not going to fail
+    if err:
+        print("INFO: stderr returned:\n", err)
+
+    print("ekb cronus checkout --branch", commit, "\n")
+    print(out)
+
+    # look for explicit problems
+    if ('Outstanding tracked changes' or 'Not a git repository' or 'Run this tool from the root' or 'Cherry-picks failed') in out:
+        print("ERROR! Failed checking of dev-ready checkouts\n", out)
+        os.chdir(cwd)
+        sys.exit(1)
+
+    # look for confirmation it worked
+    if not ('Checking out' and 'All Cherry-picks applied cleanly') in out:
+        print("ERROR! Failed checking out dev-ready checkouts\n", out)
+        os.chdir(cwd)
+        sys.exit(1)  
+
+    # write output to a file
+    filename = os.path.join(output, "cro_image_cronus_checkout.sversion")
+    outfile = open(filename, 'w')
+    outfile.write(out)
+    outfile.close()    
+                
+
 ############################################################
 # Main - Main - Main - Main - Main - Main - Main - Main
 ############################################################
@@ -183,6 +247,9 @@ examples:
 parser.add_argument('configfile', help="The configuration file used to build the image.")
 parser.add_argument('-b','--build',action='store_true',
                     help='Download repos (if not found), checkout commit and build it')
+parser.add_argument('--nobranchchange', action='store_true', help="Don't change the branch when building")
+parser.add_argument('--update', action='store_true', help="After changing to specified branch, update it from the server as well")
+parser.add_argument('--devready', action='store_true', help="Apply dev-ready ekb commits on top of branch")
 parser.add_argument('--ekb',default=None,
                     help='Base path of ekb repository. Default: use value in configfile')
 parser.add_argument('--sbe',default=None,
