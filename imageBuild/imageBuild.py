@@ -56,7 +56,7 @@ def readConfigFile(configFile):
 
 def mergeArchives(sectionName, archiveFileList, baseEntries):
     # Create an empty archive for the section
-    mergedArchiveFile = os.path.join(gendir, sectionName+'.pak')
+    mergedArchiveFile = os.path.join(mergedDir, sectionName+'.pak')
     if os.path.exists(mergedArchiveFile): os.remove(mergedArchiveFile)
     archive = pak.Archive(mergedArchiveFile)
 
@@ -77,6 +77,16 @@ def mergeArchives(sectionName, archiveFileList, baseEntries):
         if resp.returncode != 0:
             print("ERROR: %s failed with rc %d" % (cmd, resp.returncode))
             exit(1)
+
+    ## Filter out unwanted content - TODO  hopefull in time, this will not be needed.
+    if sectionName == 'runtime':
+        cmd = "%s remove %s rt/sppe.pak rt/hash.list rt/secure.hdr rt/hwkeyshash.bin" % (pakTool,mergedArchiveFile)
+        resp = subprocess.run(cmd.split())
+        # Don't care if not found
+    if sectionName == 'boot':
+        cmd = "%s remove %s boot/hash.list boot/secure.hdr main.fsm" % (pakTool,mergedArchiveFile)
+        resp = subprocess.run(cmd.split())
+        # Don't care if not_found
 
     return mergedArchiveFile
 
@@ -137,7 +147,6 @@ def setupRepository(basePath, commit,remote):
                 print('Unknown remote: %s' % remote,file=sys.stderr)
                 os.chdir(cwd)
                 sys.exit(1)
-            
 
     if 'sbe' in remote:
         cmd='./sbe workon odyssey pnor'
@@ -169,7 +178,7 @@ def setupRepository(basePath, commit,remote):
 
 def buildPartitionTable(partitions):
     # Write the  partitions file
-    partitionsfile = os.path.join(gendir,'partitions')
+    partitionsfile = os.path.join(genDir,'partitions')
     with open(partitionsfile,'w') as f:
         print(partitions, file=f)
 
@@ -177,7 +186,7 @@ def buildPartitionTable(partitions):
     cmd = "%s compile-ptable %s %s/part.tbl" % (
             flashBuildTool,
             partitionsfile,
-            gendir)
+            genDir)
     #print(cmd)
     resp = subprocess.run(cmd.split())
     if resp.returncode !=0:
@@ -185,11 +194,6 @@ def buildPartitionTable(partitions):
         sys.exit(resp.returncode)
 
     return partitionsfile
-
-def addFiles(sectionName, sectionInfo):
-    # if file does NOT exist in archive then
-    # create an empty file -
-    return
 
 def getDevReadyCommits(commit):
     print("\nRunning ./ekb cronus checkout")
@@ -217,31 +221,78 @@ def getDevReadyCommits(commit):
     filename = os.path.join(output, "cro_image_cronus_checkout.sversion")
     outfile = open(filename, 'w')
     outfile.write(out)
-    outfile.close()    
-                
+    outfile.close()
+
+def makeHashList(archiveName,hashfile):
+    # Create and load the archive
+    archive = pak.Archive(archiveName)
+    archive.load()
+
+    # Create all the hashes for the selected files
+    out.print("Creating hashes")
+    out.moreIndent()
+    for entry in archive:
+       out.print(entry.name)
+       entry.hash()
+    out.lessIndent()
+
+    #Add the hash.list content
+    archive.add(hashfile, pak.CM.store, archive.createHashList())
+
+    # Write the updated archive
+    return archive.save()
+
+def saveAndRemove(archiveName, savedArch, extractList):
+    archive = pak.Archive(archiveName)
+    archive.load()
+
+    # An non-existant or empty list would extract everything - don't allow
+    if not extractList:
+        return
+
+    try:
+        # Filter the list
+        result = archive.find(extractList)
+    except pak.ArchiveError as e:
+        out.print(str(e))
+        return
+
+    # Write the files
+    for entry in result:
+        savedArch.append(entry)
+        archive.remove(entry)
+
+    # Write it back out
+    archive.save()
+
+    return
+
+def restoreSaved(archiveName, savedArc):
+    archive = pak.Archive(archiveName)
+    archive.load()
+
+    for entry in savedArc:
+        archive.append(entry)
+
+    archive.save()
+
+def stub_cp(src, dir):
+    os.makedirs(dir,exist_ok=True)
+    for f in src:
+        cmd = "cp %s %s/" % (f,dir)
+        resp = subprocess.run(cmd.split())
 
 ############################################################
 # Main - Main - Main - Main - Main - Main - Main - Main
 ############################################################
-# NEW
-#  foreach section:
-#    if runtime:
-#     - smoosh sbe and ekb runtime paks
-#     - create part.tbl
-#     - add part.tbl
-#     if hash
-#       -calculate hash if called for
-#       -add hash
-#  build flash image from all paks
-#
-# Command line options
+
 imageToolDir = os.path.dirname(sys.argv[0])
 parser = argparse.ArgumentParser(description="Build image",
                                  formatter_class=argparse.RawDescriptionHelpFormatter,
                                  epilog=textwrap.dedent('''
 
 examples:
-  > pnorBuild.py ../imageConfigs/ody_pnor_dd1_image_config -o ./image_output -n pnor.bin
+  > imageBuild.py configs/odyssey/dd1/ody_pnor_dd1_image_config -o ./image_output -n pnor.bin
 '''))
 
 parser.add_argument('configfile', help="The configuration file used to build the image.")
@@ -302,13 +353,15 @@ pakBuildTool    = os.path.join(imageToolDir, 'pakbuild.py')
 pakTool         = os.path.join(imageToolDir, 'paktool.py')
 flashBuildTool  = os.path.join(imageToolDir, 'flashbuild.py')
 
-# TODO signHashList calls crtSigned Container.sh which resides in gsa cengel user space
-#signTool        = os.path.join(sbeBase, 'public/src/build/utils/signHashList')
-signTool = os.path.join(imageToolDir,'signHashList')
+#signTool = os.path.join(imageToolDir,'signHashList')
+# TODO these will be in sbe, not imageToolDir
+signTool = os.path.join(imageToolDir,'signimage')
+hashTool = os.path.join(imageToolDir,'imagehash')
+
 output    = os.path.abspath(args.output)
 imagefile = os.path.join(output,args.name)
-gendir = os.path.join(output,'gen')
-os.makedirs(gendir,exist_ok=True)
+genDir = os.path.join(output,'gen')
+os.makedirs(genDir,exist_ok=True)
 
 cwd = os.getcwd()
 # setup git repos and build - only if --build option specified.
@@ -331,8 +384,21 @@ replacement_tags = {
         '%ekbImageDir%' : ekbImageDir,
         '%sbeBuildDir%' : sbeBuildDir,
         '%sbeRoot%'     : sbeBase,
-        '%gen%'         : gendir,
+        '%gen%'         : genDir,
 }
+
+#### build stages
+stage1 = 'merged'
+stage2 = 'signed'
+stage3 = 'final'
+
+mergedDir = os.path.join(genDir,stage1)
+signedDir = os.path.join(genDir,stage2)
+finalDir  = os.path.join(genDir,stage3)
+
+os.makedirs(mergedDir,exist_ok=True)
+os.makedirs(signedDir,exist_ok=True)
+os.makedirs(finalDir,exist_ok=True)
 
 # Resolve archive paths in image_sections
 # Merge archives where more than one exists in an image section
@@ -361,57 +427,100 @@ for sectionName, info in section_info.items():
 partitionsfile = buildPartitionTable(partitions)
 
 # Add signature/hash to sections that require it
-signit = True
+signImgSrc = []
+hashImgSrc = []
+notHashed = {}
+
 for sectionName, info in section_info.items():
     if not info['mergedArchive']:
         continue
-    if signit and 'hashpath' in section_info[sectionName].keys():
-        hashpath = section_info[sectionName]['hashpath']
+
+    pakname = info['mergedArchive']
+
+    ## Extract and save entries that should not be hashed, then remove them from the archive
+    saveArchive = pak.Archive()
+    if 'noHash' in info.keys():
+        saveAndRemove(pakname, saveArchive, info['noHash'])
+
+    if 'hashlist' in info.keys():
+        #----------------------------
+        # Generate hash.list
+        #----------------------------
+        hashpath = info['hashpath']
+        hashlist = info['hashlist']
+
+        # hashname in archive
+        archivefn = os.path.join(hashpath,hashlist)
+
+        # full path filesystem
         outhash = os.path.join(output, hashpath)
-        scratch = os.path.join(output,'scratch')
-
         os.makedirs(outhash,exist_ok=True)
-        os.makedirs(scratch,exist_ok=True)
 
-        cmd = "%s hash %s %s/hash.list" % (pakTool,info['mergedArchive'],outhash)
-        resp = subprocess.run(cmd.split())
-        if resp.returncode !=0:
-            print("pakTool hash failed with rc %d" % resp.returncode)
-            sys.exit(resp.returncode)
+        # create hash list and add it to the archive
+        makeHashList(pakname, archivefn)
 
-        cmd = "%s -s %s -i %s/hash.list -o %s -c %s" % (
-                signTool,
-                scratch,
-                outhash,
-                outhash,
-                info['hashcomp'])
+        # Must be signed, so source pak to sign comes from stage1
+        signImgSrc.append(pakname)
+        # Must be hashed, so source pakname to hash comes from stage2
+        hashImgSrc.append(pakname.replace(stage1,stage2))
+    else:
+        # Not to be signed, only hashed, so source pakname to hash is from stage1.
+        hashImgSrc.append(pakname)
 
-        print(cmd)
-        resp = subprocess.run(cmd.split())
-        if resp.returncode !=0:
-            print("signTool failed with rc %d" % resp.returncode)
-            sys.exit(resp.returncode)
+    # All paks will exist in stage3 - used to build final flash image
+    finalName = pakname.replace(stage1,stage3)
+    section_info[sectionName]['finalArchive'] = finalName
+    notHashed[sectionName] = saveArchive
 
-        os.chdir(output)
-        cmd = "%s add %s/%s.pak %s --method %s" % (
-                pakTool,
-                gendir,
-                sectionName,
-                hashpath,
-                info['hashmethod'])
-        print(cmd)
-        resp = subprocess.run(cmd.split())
-        os.chdir(cwd)
-        if resp.returncode != 0:
-            print("pakTool add failed with rc %d" % resp.returncode)
-            sys.exit(resp.returncode)
+#----------------------------
+# Call signTool
+#----------------------------
+cmd = "%s -i %s -o %s" % (
+        signTool,
+        ' '.join(signImgSrc),
+        signedDir)
+
+if os.path.exists(signTool):
+    resp = subprocess.run(cmd.split)
+    if resp.returncode != 0:
+        print("%s failed with rc %d" % (cmd,resp.returncode))
+        sys.exit(resp.returcode)
+else:
+    print(cmd)
+    stub_cp(signImgSrc, signedDir)
+
+
+#--------------------------------
+# Call hashTool
+#--------------------------------
+cmd = "%s -i %s -o %s" % (
+        hashTool,
+        ' '.join(hashImgSrc),
+        finalDir)
+
+if os.path.exists(hashTool):
+    resp = subprocess.run(cmd.split)
+    if resp.returncode != 0:
+        print("%s failed with rc %d" % (cmd,resp.returncode))
+        sys.exit(resp.returncode)
+else:
+    print(cmd)
+    stub_cp(hashImgSrc, finalDir)
 
 
 # Create image
 cmd = "%s build-image %s %s" % (flashBuildTool, partitionsfile, imagefile)
+#----------------------------
+# Restore images not hashed
+#----------------------------
 for sectionName, info  in section_info.items():
-    cmd = "%s -p %s=%s" % (cmd, sectionName, info['mergedArchive'])
+    archive = notHashed[sectionName]
+    restoreSaved(info['finalArchive'], archive)
+    cmd = "%s -p %s=%s" % (cmd, sectionName, info['finalArchive'])
 #print(cmd)
+#-------------------------
+# Create final image
+#-------------------------
 resp = subprocess.run(cmd.split())
 if resp.returncode != 0:
     print("flashbuild failed with rc %d" % resp.returncode)

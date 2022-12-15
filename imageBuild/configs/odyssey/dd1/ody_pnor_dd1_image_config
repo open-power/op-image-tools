@@ -40,19 +40,17 @@
             # 'files' is a list of essential archive entries (files). Intended to generate
             # place holders for content that may not yet exist in the archives that
             # make up this section.
-            # They are generated with zero data length if content file doesn't exist.
+            # They are generated with zero data length if content location doesn't exist.
             # storage method is 'store' (no compression)
             # (EntryName, content location), ...
             'files' : [('part.tbl','%gen%/part.tbl')],
 
             # Size of the partion in the generated image - padded if needed
             'partition_size' : 0x20000,
+            # Generate a hash list called hash.list and add it to this image section and run signimage tool
+            'hashlist' : 'hash.list',
             # location (subdir) in PAK file for hash and sign files.
             'hashpath' : 'boot',
-            # hash component
-            'hashcomp' : 'BOOT_LDR',
-            # PAK store method for hash info
-            'hashmethod': 'store',
         },
         'runtime' : {
             # Location of archive(s) needed to build this section. Muliples are merged.
@@ -60,12 +58,11 @@
                           '%ekbImageDir%/pak/odyssey/10/odyssey.10.sppe.ram.pak'],
 
             'partition_size' : 0xC0000,
+            # Generate a hash list called hash.list and add it to this image section and run signimage tool
+            'hashlist' : 'hash.list',
             # location (dir) inside PAK file for hash and sign files
             'hashpath' : 'rt',
-            # hash component
-            'hashcomp' : 'RUN_TIME',
-            # PAK store method for hash info
-            'hashmethod' : 'zlib',
+            'noHash'   : ['Info.txt'],
         },
         'bmc' : {
             # Location of archive(s) needed to build this section
@@ -81,7 +78,8 @@
                        ('bmc/image.hash','EMPTY'),],
 
             'partition_size' : 0x8000,
-            # No hash, not signed
+            # not signed - don't provide hashlist
+            'noHash' : ['bmc/Info.txt'],
         },
         'hostboot' : {
             # Location of archive(s) needed to build this section
@@ -91,7 +89,8 @@
                        ('host/image.hash','EMPTY'),],
 
             'partition_size' : 0x8000,
-            # not signed, no hash
+            # not signed - don't specify hashlist
+            'noHash' : ['host/Info.txt'],
         },
         'rsvd' : {
             # replace this with the real archive when it exists
@@ -114,7 +113,8 @@
             'files' : [('cust/image.hash','EMPTY'),],
 
             'partition_size' : 0x10000,
-            # not signed, no hash
+            # not signed - don't specify hashlist
+            'noHash' : ['cust/Info.txt'],
         },
     },
 }
