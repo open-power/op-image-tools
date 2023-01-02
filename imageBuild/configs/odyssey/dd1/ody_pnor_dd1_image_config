@@ -64,7 +64,7 @@
             'hashlist' : 'hash.list',
             # location (dir) inside PAK file for hash and sign files
             'hashpath' : 'rt',
-            'noHash'   : ['Info.txt'],
+            'noHash'   : ['info.txt'],
             # Generate a image hash for this section by using sbe imageTool
             'imagehash': 'image.hash',
         },
@@ -82,7 +82,7 @@
 
             'partition_size' : 0x8000,
             # not signed - don't provide hashlist
-            'noHash' : ['bmc/Info.txt'],
+            'noHash' : ['bmc/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
             'imagehash': 'image.hash',
         },
@@ -94,7 +94,7 @@
 
             'partition_size' : 0x8000,
             # not signed - don't specify hashlist
-            'noHash' : ['host/Info.txt'],
+            'noHash' : ['host/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
             'imagehash': 'image.hash',
         },
@@ -112,7 +112,7 @@
 
             'partition_size' : 0x10000,
             # not signed - don't specify hashlist
-            'noHash' : ['cust/Info.txt'],
+            'noHash' : ['cust/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
             'imagehash': 'image.hash',
         },
