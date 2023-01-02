@@ -35,7 +35,7 @@
         # output pak name
         'boot' : {
             # Location of archive(s) needed to build this section. Muliple archives are merged
-            'archives' : ['%sbeRoot%/builddir/public/src/onetime/odyssey/bldr/odyssey_bldr_DD1.pak'],
+            'archives' : ['%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak'],
 
             # 'files' is a list of essential archive entries (files). Intended to generate
             # place holders for content that may not yet exist in the archives that
@@ -54,7 +54,7 @@
         },
         'runtime' : {
             # Location of archive(s) needed to build this section. Muliples are merged.
-            'archives' : ['%sbeRoot%/builddir/public/src/runtime/odyssey/sppe/odyssey_sppe_DD1.pak',
+            'archives' : ['%sbeImageDir%/odyssey/runtime/sppe/odyssey_sppe_DD1.pak',
                           '%ekbImageDir%/pak/odyssey/10/odyssey.10.sppe.ram.pak'],
 
             'partition_size' : 0xC0000,

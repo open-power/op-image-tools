@@ -345,8 +345,7 @@ if not sbeBase:
     sbeBase = config['sbeRoot']
 
 sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
-
-sbeBuildDir = os.path.join(sbeBase,'builddir')
+sbeImageDir = os.path.join(sbeBase,'images')
 
 imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
 pakBuildTool    = os.path.join(imageToolDir, 'pakbuild.py')
@@ -382,7 +381,7 @@ section_info = config['image_sections']
 
 replacement_tags = {
         '%ekbImageDir%' : ekbImageDir,
-        '%sbeBuildDir%' : sbeBuildDir,
+        '%sbeImageDir%' : sbeImageDir,
         '%sbeRoot%'     : sbeBase,
         '%gen%'         : genDir,
 }
