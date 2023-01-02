@@ -70,7 +70,7 @@
         },
         'bmc' : {
             # Location of archive(s) needed to build this section
-            'archives' : ['defaults/bmc.pak'],
+            'archives' : ['%imageToolDir%/defaults/bmc.pak'],
 
             # 'files' is a list of essential archive entries (files). Intended to generate
             # place holders for content that may not yet exist in the archives that
@@ -88,7 +88,7 @@
         },
         'host' : {
             # Location of archive(s) needed to build this section
-            'archives' : ['defaults/host.pak'],
+            'archives' : ['%imageToolDir%/defaults/host.pak'],
 
             'files' : [('host/attr.ovrd','EMPTY'),],
 
@@ -108,7 +108,7 @@
         'cust' : {
             # Location of archive(s) needed to build this section
             'archives' : ['%sbeRoot%/builddir/public/src/onetime/odyssey/cust/odyssey_cust_DD1.pak',
-                          'defaults/cust.pak'],
+                          '%imageToolDir%/defaults/cust.pak'],
 
             'partition_size' : 0x10000,
             # not signed - don't specify hashlist

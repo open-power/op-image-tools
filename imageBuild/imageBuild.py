@@ -384,6 +384,7 @@ out.setConsoleLevel(out.levels.CRITICAL)
 section_info = config['image_sections']
 
 replacement_tags = {
+        '%imageToolDir%' : imageToolDir,
         '%ekbImageDir%' : ekbImageDir,
         '%sbeImageDir%' : sbeImageDir,
         '%sbeRoot%'     : sbeBase,
