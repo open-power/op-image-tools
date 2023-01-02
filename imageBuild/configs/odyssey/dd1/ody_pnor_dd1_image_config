@@ -52,7 +52,7 @@
             # location (subdir) in PAK file for hash and sign files.
             'hashpath' : 'boot',
         },
-        'runtime' : {
+        'rt' : {
             # Location of archive(s) needed to build this section. Muliples are merged.
             'archives' : ['%sbeImageDir%/odyssey/runtime/sppe/odyssey_sppe_DD1.pak',
                           '%ekbImageDir%/pak/odyssey/10/odyssey.10.sppe.ram.pak'],

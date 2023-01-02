@@ -24,6 +24,7 @@ import textwrap
 import subprocess
 import ast
 import shutil
+import tarfile
 
 def readConfigFile(configFile):
     with open(configFile, "r") as f:
@@ -79,7 +80,7 @@ def mergeArchives(sectionName, archiveFileList, baseEntries):
             exit(1)
 
     ## Filter out unwanted content - TODO  hopefull in time, this will not be needed.
-    if sectionName == 'runtime':
+    if sectionName == 'rt':
         cmd = "%s remove %s rt/sppe.pak rt/hash.list rt/secure.hdr rt/hwkeyshash.bin" % (pakTool,mergedArchiveFile)
         resp = subprocess.run(cmd.split())
         # Don't care if not found
@@ -278,7 +279,7 @@ def restoreSaved(archiveName, savedArc):
 
 def stub_cp(src, dir):
     os.makedirs(dir,exist_ok=True)
-    for f in src:
+    for f in src.values():
         cmd = "cp %s %s/" % (f,dir)
         resp = subprocess.run(cmd.split())
 
@@ -352,12 +353,8 @@ pakBuildTool    = os.path.join(imageToolDir, 'pakbuild.py')
 pakTool         = os.path.join(imageToolDir, 'paktool')
 flashBuildTool  = os.path.join(imageToolDir, 'flashbuild.py')
 
-#signTool = os.path.join(imageToolDir,'signHashList')
-# TODO these will be in sbe, not imageToolDir
-signTool = os.path.join(imageToolDir,'signimage')
-hashTool = os.path.join(imageToolDir,'imagehash')
-
 output    = os.path.abspath(args.output)
+
 imagefile = os.path.join(output,args.name)
 genDir = os.path.join(output,'gen')
 os.makedirs(genDir,exist_ok=True)
@@ -368,6 +365,13 @@ if args.build:
     setupRepository(ekbBase, config['ekbCommit'],'hw/ekb-src')
     setupRepository(sbeBase, config['sbeCommit'],'hw/sbe')
 os.chdir(cwd)
+
+#signTool = os.path.join(imageToolDir,'signHashList')
+# Untar sbe_tools.tar.gz to get sbe tools
+sbeTools = tarfile.open(os.path.join(sbeImageDir, "sbe_tools.tar.gz"))
+sbeTools.extractall(output)
+sbeToolsDir = os.path.join(output,'sbe_tools')
+sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
 
 sys.path.append("%s/public/common/utils/imageProcs/tools/pymod" % ekbBase)
 
@@ -426,8 +430,8 @@ for sectionName, info in section_info.items():
 partitionsfile = buildPartitionTable(partitions)
 
 # Add signature/hash to sections that require it
-signImgSrc = []
-hashImgSrc = []
+signImgSrc = {}
+hashImgSrc = {}
 notHashed = {}
 
 for sectionName, info in section_info.items():
@@ -459,12 +463,12 @@ for sectionName, info in section_info.items():
         makeHashList(pakname, archivefn)
 
         # Must be signed, so source pak to sign comes from stage1
-        signImgSrc.append(pakname)
+        signImgSrc[sectionName] = pakname
         # Must be hashed, so source pakname to hash comes from stage2
-        hashImgSrc.append(pakname.replace(stage1,stage2))
+        hashImgSrc[sectionName] = pakname.replace(stage1,stage2)
     else:
         # Not to be signed, only hashed, so source pakname to hash is from stage1.
-        hashImgSrc.append(pakname)
+        hashImgSrc[sectionName] = pakname
 
     # All paks will exist in stage3 - used to build final flash image
     finalName = pakname.replace(stage1,stage3)
@@ -472,22 +476,23 @@ for sectionName, info in section_info.items():
     notHashed[sectionName] = saveArchive
 
 #----------------------------
-# Call signTool
+# Call sbeImageTool signPak
 #----------------------------
-cmd = "%s -i %s -o %s" % (
-        signTool,
-        ' '.join(signImgSrc),
-        signedDir)
+pakFilesToSign = ""
+for sectionName, pakFile in signImgSrc.items():
+    pakFilesToSign += sectionName + "=" + pakFile + " "
 
-if os.path.exists(signTool):
-    resp = subprocess.run(cmd.split)
+cmd = f"{sbeImageTool} --pakToolDir {imageToolDir} \
+        signPak --pakFiles {pakFilesToSign}"
+print(cmd)
+
+if os.path.exists(sbeImageTool):
+    resp = subprocess.run(cmd.split())
     if resp.returncode != 0:
         print("%s failed with rc %d" % (cmd,resp.returncode))
         sys.exit(resp.returcode)
-else:
-    print(cmd)
-    stub_cp(signImgSrc, signedDir)
-
+    else:
+        stub_cp(signImgSrc, signedDir)
 
 #--------------------------------
 # Call hashTool
