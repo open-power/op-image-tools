@@ -466,7 +466,7 @@ for sectionName, info in section_info.items():
         signImgSrc[sectionName] = pakname
         # Must be hashed, so source pakname to hash comes from stage2
         hashImgSrc[sectionName] = pakname.replace(stage1,stage2)
-    else:
+    elif 'imagehash' in info.keys():
         # Not to be signed, only hashed, so source pakname to hash is from stage1.
         hashImgSrc[sectionName] = pakname
 
@@ -495,21 +495,23 @@ if os.path.exists(sbeImageTool):
         stub_cp(signImgSrc, signedDir)
 
 #--------------------------------
-# Call hashTool
+# Call sbeImageTool pakHash
 #--------------------------------
-cmd = "%s -i %s -o %s" % (
-        hashTool,
-        ' '.join(hashImgSrc),
-        finalDir)
+pakFilesToHash = ""
+for sectionName, pakFile in hashImgSrc.items():
+    pakFilesToHash += sectionName + "=" + pakFile + " "
 
-if os.path.exists(hashTool):
-    resp = subprocess.run(cmd.split)
+cmd = f"{sbeImageTool} --pakToolDir {imageToolDir} \
+        pakHash --pakFiles {pakFilesToHash}"
+print(cmd)
+
+if os.path.exists(sbeImageTool):
+    resp = subprocess.run(cmd.split())
     if resp.returncode != 0:
         print("%s failed with rc %d" % (cmd,resp.returncode))
         sys.exit(resp.returncode)
-else:
-    print(cmd)
-    stub_cp(hashImgSrc, finalDir)
+    else:
+        stub_cp(hashImgSrc, finalDir)
 
 
 # Create image

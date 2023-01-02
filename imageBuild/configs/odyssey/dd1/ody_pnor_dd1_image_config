@@ -51,6 +51,8 @@
             'hashlist' : 'hash.list',
             # location (subdir) in PAK file for hash and sign files.
             'hashpath' : 'boot',
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
         },
         'rt' : {
             # Location of archive(s) needed to build this section. Muliples are merged.
@@ -63,6 +65,8 @@
             # location (dir) inside PAK file for hash and sign files
             'hashpath' : 'rt',
             'noHash'   : ['Info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
         },
         'bmc' : {
             # Location of archive(s) needed to build this section
@@ -74,23 +78,25 @@
             # They are generated with zero data length if content file doesn't exist.
             # storage method is 'store' (no compression)
             # (EntryName, content location), ...
-            'files' : [('bmc/attr.ovrd','EMPTY'),
-                       ('bmc/image.hash','EMPTY'),],
+            'files' : [('bmc/attr.ovrd','EMPTY'),],
 
             'partition_size' : 0x8000,
             # not signed - don't provide hashlist
             'noHash' : ['bmc/Info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
         },
-        'hostboot' : {
+        'host' : {
             # Location of archive(s) needed to build this section
             'archives' : ['defaults/host.pak'],
 
-            'files' : [('host/attr.ovrd','EMPTY'),
-                       ('host/image.hash','EMPTY'),],
+            'files' : [('host/attr.ovrd','EMPTY'),],
 
             'partition_size' : 0x8000,
             # not signed - don't specify hashlist
             'noHash' : ['host/Info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
         },
         'rsvd' : {
             # replace this with the real archive when it exists
@@ -104,17 +110,11 @@
             'archives' : ['%sbeRoot%/builddir/public/src/onetime/odyssey/cust/odyssey_cust_DD1.pak',
                           'defaults/cust.pak'],
 
-            # 'files' is a list of essential archive entries (files). Intended to generate
-            # place holders for content that may not yet exist in the sub-archives that
-            # make up this section.
-            # They are generated with zero data length if content file doesn't exist.
-            # method is store (no compression)
-            # (archiveName, content location), ...
-            'files' : [('cust/image.hash','EMPTY'),],
-
             'partition_size' : 0x10000,
             # not signed - don't specify hashlist
             'noHash' : ['cust/Info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
         },
     },
 }
