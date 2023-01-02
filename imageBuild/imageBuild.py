@@ -350,7 +350,7 @@ sbeBuildDir = os.path.join(sbeBase,'builddir')
 
 imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
 pakBuildTool    = os.path.join(imageToolDir, 'pakbuild.py')
-pakTool         = os.path.join(imageToolDir, 'paktool.py')
+pakTool         = os.path.join(imageToolDir, 'paktool')
 flashBuildTool  = os.path.join(imageToolDir, 'flashbuild.py')
 
 #signTool = os.path.join(imageToolDir,'signHashList')
