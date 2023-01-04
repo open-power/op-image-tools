@@ -10,5 +10,5 @@ Existing repos
 ```
 Clone and build repos.   In this example, the location where the ekb and sbe repositories should be cloned to, and which commit to use, are specified in the config
 ```
-./imageBuild.py configs/odyssey/dd1/ody_pnor_dd1_image_config  --output output -name pnor.bin --build
+./imageBuild.py configs/odyssey/dd1/ody_pnor_dd1_image_config  --output output --name pnor.bin --build
 ```
