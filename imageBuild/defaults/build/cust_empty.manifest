@@ -10,7 +10,7 @@
         'cust/image.hash': {
             'file': 'emptyfile',
         },
-        'cust/Info.txt': {
+        'cust/info.txt': {
             'file': 'custbuildinfo.txt',
         },
     },

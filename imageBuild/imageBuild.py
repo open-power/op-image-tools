@@ -81,11 +81,11 @@ def mergeArchives(sectionName, archiveFileList, baseEntries):
 
     ## Filter out unwanted content - TODO  hopefull in time, this will not be needed.
     if sectionName == 'rt':
-        cmd = "%s remove %s rt/sppe.pak rt/hash.list rt/secure.hdr rt/hwkeyshash.bin" % (pakTool,mergedArchiveFile)
+        cmd = "%s remove %s rt/sppe.pak" % (pakTool,mergedArchiveFile)
         resp = subprocess.run(cmd.split())
         # Don't care if not found
     if sectionName == 'boot':
-        cmd = "%s remove %s boot/hash.list boot/secure.hdr main.fsm" % (pakTool,mergedArchiveFile)
+        cmd = "%s remove %s main.fsm" % (pakTool,mergedArchiveFile)
         resp = subprocess.run(cmd.split())
         # Don't care if not_found
 
@@ -349,7 +349,7 @@ sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
 sbeImageDir = os.path.join(sbeBase,'images')
 
 imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
-pakBuildTool    = os.path.join(imageToolDir, 'pakbuild.py')
+pakBuildTool    = os.path.join(imageToolDir, 'pakbuild')
 pakTool         = os.path.join(imageToolDir, 'paktool')
 flashBuildTool  = os.path.join(imageToolDir, 'flashbuild.py')
 
@@ -433,6 +433,8 @@ partitionsfile = buildPartitionTable(partitions)
 # Add signature/hash to sections that require it
 signImgSrc = {}
 hashImgSrc = {}
+asisImgSrc = {}
+
 notHashed = {}
 
 for sectionName, info in section_info.items():
@@ -470,6 +472,9 @@ for sectionName, info in section_info.items():
     elif 'imagehash' in info.keys():
         # Not to be signed, only hashed, so source pakname to hash is from stage1.
         hashImgSrc[sectionName] = pakname
+
+    else:
+        asisImgSrc[sectionName] = pakname
 
     # All paks will exist in stage3 - used to build final flash image
     finalName = pakname.replace(stage1,stage3)
@@ -514,6 +519,7 @@ if os.path.exists(sbeImageTool):
     else:
         stub_cp(hashImgSrc, finalDir)
 
+stub_cp(asisImgSrc, finalDir)
 
 # Create image
 cmd = "%s build-image %s %s" % (flashBuildTool, partitionsfile, imagefile)

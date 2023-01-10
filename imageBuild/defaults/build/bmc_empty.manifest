@@ -13,7 +13,7 @@
         'bmc/image.hash': {
             'file': 'emptyfile',
         },
-        'bmc/Info.txt': {
+        'bmc/info.txt': {
             'file': 'bmcbuildinfo.txt',
         },
     },
