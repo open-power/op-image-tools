@@ -235,6 +235,10 @@ class ArchiveEntry(object):
     def isize(self):
         return len(self.idata)
 
+    @property
+    def is_pad(self):
+        return self.magic == PAK_PAD
+
     def packHdrc(self):
         '''
         Create the bytearray hdrc data that can be written
@@ -621,7 +625,7 @@ class Archive(UserList):
         # Return the data
         return result[0].ddata
 
-    def find(self, patterns):
+    def find(self, patterns, include_dirs=True):
         '''
         Search the archive for names matching patterns and return them
         '''
@@ -638,7 +642,7 @@ class Archive(UserList):
         all_names = [e.name for e in self]
         for pattern in patterns:
             # Load all the names into a list for fnfilter to search
-            found_names = set(fnmatch.filter(all_names, pattern) + fnmatch.filter(all_names, pattern + "/*"))
+            found_names = set(fnmatch.filter(all_names, pattern) + (fnmatch.filter(all_names, pattern + "/*") if include_dirs else []))
             # If we found nothing, raise an error, otherwise add to the returned result
             if not found_names:
                 raise ArchiveError("No files matching '%s' found in archive" % pattern)

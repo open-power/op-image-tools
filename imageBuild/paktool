@@ -2,7 +2,7 @@
 # IBM_PROLOG_BEGIN_TAG
 # This is an automatically generated prolog.
 #
-# $Source: paktool $
+# $Source: public/common/utils/imageProcs/tools/paktool $
 #
 # IBM CONFIDENTIAL
 #
@@ -87,6 +87,10 @@ def cmd_extract(args):
 
     # Write the files
     for entry in result:
+        # do not try to extract padding
+        if entry.is_pad:
+            continue
+
         ename = os.path.join(args.outdir, entry.name)
         out.print("Extracting %s -> %s " % (entry.name, ename))
         os.makedirs(os.path.dirname(ename), exist_ok=True)
@@ -109,7 +113,7 @@ def cmd_list(args):
         # We can have paks in paks in paks, so this needs to be a recursive find until we run out
         while True:
             try:
-                paksInPaks = result.find("*.pak")
+                paksInPaks = result.find("*.pak", include_dirs=False)
             except:
                 # An exception is raised when no match is found
                 # That means we are out of paks and done

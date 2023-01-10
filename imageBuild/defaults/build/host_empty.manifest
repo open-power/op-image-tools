@@ -13,7 +13,7 @@
         'host/image.hash': {
             'file': 'emptyfile',
         },
-        'host/Info.txt': {
+        'host/info.txt': {
             'file': 'hostbuildinfo.txt',
         },
     },
