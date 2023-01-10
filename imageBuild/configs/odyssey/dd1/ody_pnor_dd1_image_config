@@ -86,7 +86,7 @@
             # not signed - don't provide hashlist
             'noHash' : ['bmc/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
-            'imagehash': 'image.hash',
+            #'imagehash': 'image.hash',
         },
         'host' : {
             # Location of archive(s) needed to build this section
@@ -98,7 +98,7 @@
             # not signed - don't specify hashlist
             'noHash' : ['host/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
-            'imagehash': 'image.hash',
+            #'imagehash': 'image.hash',
         },
         'rsvd' : {
             # replace this with the real archive when it exists
@@ -113,12 +113,11 @@
 
             # Essential files that will be created if they don't already exist
             'files'    : [('cust/cust.fsm','EMPTY'),],
-
             'partition_size' : 0x10000,
             # not signed - don't specify hashlist
             'noHash' : ['cust/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
-            'imagehash': 'image.hash',
+            #'imagehash': 'image.hash',
         },
     },
 }
