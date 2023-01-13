@@ -79,16 +79,6 @@ def mergeArchives(sectionName, archiveFileList, baseEntries):
             print("ERROR: %s failed with rc %d" % (cmd, resp.returncode))
             exit(1)
 
-    ## Filter out unwanted content - TODO  hopefull in time, this will not be needed.
-    if sectionName == 'rt':
-        cmd = "%s remove %s rt/sppe.pak" % (pakTool,mergedArchiveFile)
-        resp = subprocess.run(cmd.split())
-        # Don't care if not found
-    if sectionName == 'boot':
-        cmd = "%s remove %s main.fsm" % (pakTool,mergedArchiveFile)
-        resp = subprocess.run(cmd.split())
-        # Don't care if not_found
-
     return mergedArchiveFile
 
 def setupRepository(basePath, commit,remote):
@@ -306,6 +296,8 @@ parser.add_argument('--ekb',default=None,
                     help='Base path of ekb repository. Default: use value in configfile')
 parser.add_argument('--sbe',default=None,
                     help='Base path of sbe repository. Defulat: use value in configfile')
+parser.add_argument('--ovrd',default=None,
+                    help='Directory to look for override archive source files. Files must have same name as those being overridden')
 parser.add_argument('-o','--output', default='./image_output',
                     help='output directory. default ./image_output')
 parser.add_argument('-n','--name', default='image.bin',
@@ -356,6 +348,13 @@ flashBuildTool  = os.path.join(imageToolDir, 'flashbuild.py')
 output    = os.path.abspath(args.output)
 
 imagefile = os.path.join(output,args.name)
+singleImagefile = imagefile
+concatCopies = 0
+if 'concat' in config.keys():
+    singleImagefile = os.path.join(output,"single_" + args.name)
+    concatCopies = config['concat']
+
+
 genDir = os.path.join(output,'gen')
 os.makedirs(genDir,exist_ok=True)
 
@@ -373,7 +372,7 @@ sbeTools.extractall(output)
 sbeToolsDir = os.path.join(output,'sbe_tools')
 sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
 
-sys.path.append("%s/public/common/utils/imageProcs/tools/pymod" % ekbBase)
+sys.path.append("%s/pymod" % imageToolDir)
 
 from output import out
 import pakcore as pak
@@ -383,18 +382,10 @@ out.setConsoleLevel(out.levels.CRITICAL)
 
 section_info = config['image_sections']
 
-replacement_tags = {
-        '%imageToolDir%' : imageToolDir,
-        '%ekbImageDir%' : ekbImageDir,
-        '%sbeImageDir%' : sbeImageDir,
-        '%sbeRoot%'     : sbeBase,
-        '%gen%'         : genDir,
-}
-
 #### build stages
 stage1 = 'merged'
 stage2 = 'signed'
-stage3 = 'final'
+stage3 = 'final'  #hashed
 
 mergedDir = os.path.join(genDir,stage1)
 signedDir = os.path.join(genDir,stage2)
@@ -403,6 +394,29 @@ finalDir  = os.path.join(genDir,stage3)
 os.makedirs(mergedDir,exist_ok=True)
 os.makedirs(signedDir,exist_ok=True)
 os.makedirs(finalDir,exist_ok=True)
+
+#
+replacement_tags = {
+        '%imageToolDir%' : imageToolDir,
+        '%ekbImageDir%' : ekbImageDir,
+        '%sbeImageDir%' : sbeImageDir,
+        '%sbeRoot%'     : sbeBase,
+        '%gen%'         : genDir,
+}
+
+## Load overrides
+overides = {}
+if args.ovrd:
+    path = os.path.realpath(os.path.expanduser(args.ovrd))
+    if os.path.exists(path):
+        files = os.listdir(path)
+        for f in files:
+            fullpath = os.path.join(path,f)
+            if os.path.isfile(fullpath):
+                overides[f] = fullpath
+    else:
+        print("WARN override directory does not exist: %s" % path)
+
 
 # Resolve archive paths in image_sections
 # Merge archives where more than one exists in an image section
@@ -415,6 +429,12 @@ for sectionName, info in section_info.items():
     for arc in info['archives']:
         for key,value in replacement_tags.items():
             arc = arc.replace(key,value)
+
+        arcFileName = os.path.basename(arc)
+        if arcFileName in overides.keys():
+            print("Override:\n%s\n  with\n%s" % (arc,overides[arcFileName]))
+            arc = overides[arcFileName]  ## get full path
+
         archives.append(arc)
 
     if 'files' in info.keys():
@@ -522,7 +542,7 @@ if os.path.exists(sbeImageTool):
 stub_cp(asisImgSrc, finalDir)
 
 # Create image
-cmd = "%s build-image %s %s" % (flashBuildTool, partitionsfile, imagefile)
+cmd = "%s build-image %s %s" % (flashBuildTool, partitionsfile, singleImagefile)
 #----------------------------
 # Restore images not hashed
 #----------------------------
@@ -538,6 +558,16 @@ resp = subprocess.run(cmd.split())
 if resp.returncode != 0:
     print("flashbuild failed with rc %d" % resp.returncode)
     sys.exit(resp.returncode)
+
+if concatCopies != 0:
+    shutil.copyfile(singleImagefile, imagefile)
+
+    f1 = open(imagefile, 'ab+')
+    for i in range(concatCopies-1):
+        f = open(singleImagefile, 'rb')
+        f1.write(f.read())
+        f.close()
+    f1.close()
 
 
 

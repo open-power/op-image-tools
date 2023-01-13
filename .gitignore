@@ -11,5 +11,6 @@ models
 *.sw*
 pfd_infra_tools
 output
+image_output
 __pycache__
 .pyc
