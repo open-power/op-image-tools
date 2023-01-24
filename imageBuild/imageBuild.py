@@ -286,22 +286,35 @@ examples:
   > imageBuild.py configs/odyssey/dd1/ody_pnor_dd1_image_config -o ./image_output -n pnor.bin
 '''))
 
-parser.add_argument('configfile', help="The configuration file used to build the image.")
+parser.add_argument('configfile',
+                    help="The configuration file used to build the image.")
 parser.add_argument('-b','--build',action='store_true',
-                    help='Download repos (if not found), checkout commit and build it')
-parser.add_argument('--nobranchchange', action='store_true', help="Don't change the branch when building")
-parser.add_argument('--update', action='store_true', help="After changing to specified branch, update it from the server as well")
-parser.add_argument('--devready', action='store_true', help="Apply dev-ready ekb commits on top of branch")
+                    help='Download repos (if not found), '
+                    'then checkout commit and build it')
+parser.add_argument('--nobranchchange', action='store_true',
+                    help="Don't change the branch when building")
+parser.add_argument('--update', action='store_true',
+                    help='After changing to specified branch, '
+                    'update it from the server as well')
+parser.add_argument('--devready', action='store_true',
+                    help='Apply dev-ready ekb commits on top of branch')
 parser.add_argument('--ekb',default=None,
-                    help='Base path of ekb repository. Default: use value in configfile')
+                    help='Base path of ekb repository. '
+                    'Default: use value in configfile')
 parser.add_argument('--sbe',default=None,
-                    help='Base path of sbe repository. Defulat: use value in configfile')
+                    help='Base path of sbe repository. Default: use value '
+                    'in configfile')
 parser.add_argument('--ovrd',default=None,
-                    help='Directory to look for override archive source files. Files must have same name as those being overridden')
+                    help='Directory to look for override archive source files.'
+                    ' Files must have same name as those being overridden')
 parser.add_argument('-o','--output', default='./image_output',
                     help='output directory. default ./image_output')
 parser.add_argument('-n','--name', default='image.bin',
                     help='output image filename. default: image.bin')
+parser.add_argument('--pakToolDir',default=None,
+                    help='Directory of PAK tools. '
+                    'Only required if not using valid SBE/EKB. '
+                    'Default is to look for PAK tools in SBE/EKB repositories')
 args = parser.parse_args()
 
 # process the configuration file and load needed modules whos location is based on
@@ -340,10 +353,30 @@ if not sbeBase:
 sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
 sbeImageDir = os.path.join(sbeBase,'images')
 
+## pak tools
+pakToolsDir = args.pakToolDir
+if(pakToolsDir):
+    pakToolsDir = os.path.realpath(os.path.expanduser(pakToolsDir))
+else:
+    pakToolsDir = os.path.join(sbeBase,'public','src','import','public',
+                               'common','utils','imageProcs','tools')
+if not os.path.exists(pakToolsDir):
+    pakToolsDir = os.path.join(ekbBase,'public','common','utils',
+                               'imageProcs','tools')
+    if not os.path.exists(pakToolsDir):
+        print("ERROR:  Can't find paktools")
+        sys.exit(1)
+
+# Required before calling pak tools
+sys.path.append("%s/pymod" % pakToolsDir)
+
+from output import out
+import pakcore as pak
+
 imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
-pakBuildTool    = os.path.join(imageToolDir, 'pakbuild')
-pakTool         = os.path.join(imageToolDir, 'paktool')
-flashBuildTool  = os.path.join(imageToolDir, 'flashbuild.py')
+pakBuildTool    = os.path.join(pakToolsDir, 'pakbuild')
+pakTool         = os.path.join(pakToolsDir, 'paktool')
+flashBuildTool  = os.path.join(pakToolsDir, 'flashbuild')
 
 output    = os.path.abspath(args.output)
 
@@ -351,8 +384,9 @@ imagefile = os.path.join(output,args.name)
 singleImagefile = imagefile
 concatCopies = 0
 if 'concat' in config.keys():
-    singleImagefile = os.path.join(output,"single_" + args.name)
     concatCopies = config['concat']
+if concatCopies > 1:
+    singleImagefile = os.path.join(output,"single_" + args.name)
 
 
 genDir = os.path.join(output,'gen')
@@ -365,17 +399,16 @@ if args.build:
     setupRepository(sbeBase, config['sbeCommit'],'hw/sbe')
 os.chdir(cwd)
 
-#signTool = os.path.join(imageToolDir,'signHashList')
 # Untar sbe_tools.tar.gz to get sbe tools
 sbeTools = tarfile.open(os.path.join(sbeImageDir, "sbe_tools.tar.gz"))
 sbeTools.extractall(output)
 sbeToolsDir = os.path.join(output,'sbe_tools')
 sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
 
-sys.path.append("%s/pymod" % imageToolDir)
-
-from output import out
-import pakcore as pak
+sbeEccTool = os.path.join(sbeToolsDir,'ecc')
+if not os.path.exists(sbeEccTool):
+    print("ERROR: %s does not exist. Make sure SBE is current" % sbeEccTool)
+    sys.exit(1)
 
 #only print out critical errors. For debug, change CRITICAL to DEBUG
 out.setConsoleLevel(out.levels.CRITICAL)
@@ -508,7 +541,7 @@ pakFilesToSign = ""
 for sectionName, pakFile in signImgSrc.items():
     pakFilesToSign += sectionName + "=" + pakFile + " "
 
-cmd = f"{sbeImageTool} --pakToolDir {imageToolDir} \
+cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
         signPak --pakFiles {pakFilesToSign}"
 print(cmd)
 
@@ -527,7 +560,7 @@ pakFilesToHash = ""
 for sectionName, pakFile in hashImgSrc.items():
     pakFilesToHash += sectionName + "=" + pakFile + " "
 
-cmd = f"{sbeImageTool} --pakToolDir {imageToolDir} \
+cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
         pakHash --pakFiles {pakFilesToHash}"
 print(cmd)
 
@@ -559,7 +592,7 @@ if resp.returncode != 0:
     print("flashbuild failed with rc %d" % resp.returncode)
     sys.exit(resp.returncode)
 
-if concatCopies != 0:
+if concatCopies > 1:
     shutil.copyfile(singleImagefile, imagefile)
 
     f1 = open(imagefile, 'ab+')
@@ -568,6 +601,17 @@ if concatCopies != 0:
         f1.write(f.read())
         f.close()
     f1.close()
+
+#--------------------------
+# ecc
+#--------------------------
+eccImagefile = imagefile+'.ecc'
+cmd = "%s --inject %s --output %s --p8" % (sbeEccTool,imagefile,eccImagefile)
+resp = subprocess.run(cmd.split())
+if resp.returncode != 0:
+    print("ecc failed with rc %d" % resp.returncode)
+    sys.exit(resp.returncode)
+
 
 
 

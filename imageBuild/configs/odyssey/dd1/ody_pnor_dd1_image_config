@@ -30,6 +30,9 @@
     # sbeCommit only matters if --build option is used on imageBuild.py
     'sbeCommit' : 'main',
 
+    # Concatinate specified number of generated images to finalImage (Probably pnor only)
+    'concat'  : 3,
+
     # Definition of sections
     'image_sections' : {
         # output pak name
