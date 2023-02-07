@@ -140,13 +140,12 @@ def setupRepository(basePath, commit,remote):
                 sys.exit(1)
 
     if 'sbe' in remote:
-        cmd='./sbe workon odyssey pnor'
-        #cmd='internal/src/test/framework/build-script'
-        build_cmd='source env.bash\nmesonwrap setup\nmesonwrap build\n./sbe clean\n./sbe build\n'
-        #%s/internal/src/test/framework/build-script\n' % basePath
+        cmd= config['sbeWorkon']
+        build_cmd=config['sbeBuild']
+
     elif 'ekb' in remote:
-        cmd='./ekb workon'
-        build_cmd='rm -Rf ./output/*\n./ekb build\n'
+        cmd= config['ekbWorkon']
+        build_cmd= config['ekbBuild']
         if args.devready:
             if not args.nobranchchange:
                 getDevReadyCommits(commit)
@@ -188,30 +187,30 @@ def buildPartitionTable(partitions):
 
 def getDevReadyCommits(commit):
     print("\nRunning ./ekb cronus checkout")
-    out, err = subprocess.Popen(['source ./env.bash; ./ekb cronus checkout --branch', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()
+    dev_out, err = subprocess.Popen(['source ./env.bash; ./ekb cronus checkout --branch', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()
     # Sometimes seeing stuff in stderr that isn't actually an error, so not going to fail
     if err:
         print("INFO: stderr returned:\n", err)
 
     print("ekb cronus checkout --branch", commit, "\n")
-    print(out)
+    print(dev_out)
 
     # look for explicit problems
-    if ('Outstanding tracked changes' or 'Not a git repository' or 'Run this tool from the root' or 'Cherry-picks failed') in out:
-        print("ERROR! Failed checking of dev-ready checkouts\n", out)
+    if ('Outstanding tracked changes' or 'Not a git repository' or 'Run this tool from the root' or 'Cherry-picks failed') in dev_out:
+        print("ERROR! Failed checking of dev-ready checkouts\n", dev_out)
         os.chdir(cwd)
         sys.exit(1)
 
     # look for confirmation it worked
-    if not ('Checking out' and 'All Cherry-picks applied cleanly') in out:
-        print("ERROR! Failed checking out dev-ready checkouts\n", out)
+    if not ('Checking out' and 'All Cherry-picks applied cleanly') in dev_out:
+        print("ERROR! Failed checking out dev-ready checkouts\n", dev_out)
         os.chdir(cwd)
-        sys.exit(1)  
+        sys.exit(1)
 
     # write output to a file
     filename = os.path.join(output, "cro_image_cronus_checkout.sversion")
     outfile = open(filename, 'w')
-    outfile.write(out)
+    outfile.write(dev_out)
     outfile.close()
 
 def makeHashList(archiveName,hashfile):
@@ -353,6 +352,15 @@ if not sbeBase:
 sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
 sbeImageDir = os.path.join(sbeBase,'images')
 
+output    = os.path.abspath(args.output)
+
+cwd = os.getcwd()
+# setup git repos and build - only if --build option specified.
+if args.build:
+    setupRepository(ekbBase, config['ekbCommit'],'hw/ekb-src')
+    setupRepository(sbeBase, config['sbeCommit'],'hw/sbe')
+os.chdir(cwd)
+
 ## pak tools
 pakToolsDir = args.pakToolDir
 if(pakToolsDir):
@@ -367,18 +375,11 @@ if not os.path.exists(pakToolsDir):
         print("ERROR:  Can't find paktools")
         sys.exit(1)
 
-# Required before calling pak tools
-sys.path.append("%s/pymod" % pakToolsDir)
-
-from output import out
-import pakcore as pak
-
 imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
 pakBuildTool    = os.path.join(pakToolsDir, 'pakbuild')
 pakTool         = os.path.join(pakToolsDir, 'paktool')
 flashBuildTool  = os.path.join(pakToolsDir, 'flashbuild')
 
-output    = os.path.abspath(args.output)
 
 imagefile = os.path.join(output,args.name)
 singleImagefile = imagefile
@@ -392,15 +393,35 @@ if concatCopies > 1:
 genDir = os.path.join(output,'gen')
 os.makedirs(genDir,exist_ok=True)
 
-cwd = os.getcwd()
-# setup git repos and build - only if --build option specified.
-if args.build:
-    setupRepository(ekbBase, config['ekbCommit'],'hw/ekb-src')
-    setupRepository(sbeBase, config['sbeCommit'],'hw/sbe')
-os.chdir(cwd)
+# Required before calling pak tools
+sys.path.append("%s/pymod" % pakToolsDir)
+
+from output import out
+import pakcore as pak
+
+
+## Load overrides
+overides = {}
+if args.ovrd:
+    path = os.path.realpath(os.path.expanduser(args.ovrd))
+    if os.path.exists(path):
+        files = os.listdir(path)
+        for f in files:
+            fullpath = os.path.join(path,f)
+            if os.path.isfile(fullpath):
+                overides[f] = fullpath
+    else:
+        print("WARN override directory does not exist: %s" % path)
+
 
 # Untar sbe_tools.tar.gz to get sbe tools
-sbeTools = tarfile.open(os.path.join(sbeImageDir, "sbe_tools.tar.gz"))
+sbeToolsTar = "sbe_tools.tar.gz"
+if(sbeToolsTar in overides.keys()):
+    sbeToolsTar = overides[sbeToolsTar]
+else:
+    sbeToolsTar = os.path.join(sbeImageDir, sbeToolsTar)
+
+sbeTools = tarfile.open(sbeToolsTar)
 sbeTools.extractall(output)
 sbeToolsDir = os.path.join(output,'sbe_tools')
 sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
@@ -436,19 +457,6 @@ replacement_tags = {
         '%sbeRoot%'     : sbeBase,
         '%gen%'         : genDir,
 }
-
-## Load overrides
-overides = {}
-if args.ovrd:
-    path = os.path.realpath(os.path.expanduser(args.ovrd))
-    if os.path.exists(path):
-        files = os.listdir(path)
-        for f in files:
-            fullpath = os.path.join(path,f)
-            if os.path.isfile(fullpath):
-                overides[f] = fullpath
-    else:
-        print("WARN override directory does not exist: %s" % path)
 
 
 # Resolve archive paths in image_sections

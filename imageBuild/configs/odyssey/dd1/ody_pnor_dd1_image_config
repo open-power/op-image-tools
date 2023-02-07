@@ -24,11 +24,17 @@
     'ekbRoot'   : '~/sandbox/p11/ekb-src',
     # ekbCommit only matters if --build option is used on imageBuild.py
     'ekbCommit' : 'main',
+    # ekb workon/build commands
+    'ekbWorkon' : './ekb workon',
+    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build odyssey.10.sppe.ram.pak\n',
 
     # sbeRoot can be overridden by passing repo path into imageBuild.py using --sbe
     'sbeRoot'   : '~/sandbox/p11/sbe',
     # sbeCommit only matters if --build option is used on imageBuild.py
     'sbeCommit' : 'main',
+    # sbe workon/build commands
+    'sbeWorkon' : './sbe workon odyssey pnor',
+    'sbeBuild'  : 'source env.bash\nmesonwrap setup\nmesonwrap build\n./sbe clean\n./sbe build\n',
 
     # Concatinate specified number of generated images to finalImage (Probably pnor only)
     'concat'  : 3,
