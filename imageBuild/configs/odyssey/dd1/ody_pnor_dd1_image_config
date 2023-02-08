@@ -112,8 +112,6 @@
             # Location of archive(s) needed to build this section
             'archives' : ['%imageToolDir%/defaults/cust.pak'],
 
-            # Essential files that will be created if they don't already exist
-            'files'    : [('cust.fsm','%ekbImageDir%/cmdtable/odyssey/10/cust.fsm'),],
             'partition_size' : 0x10000,
             # not signed - don't specify hashlist
             'noHash' : ['cust/info.txt'],
