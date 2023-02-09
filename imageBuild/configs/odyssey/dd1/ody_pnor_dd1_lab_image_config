@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+# this is not a python executable, rather the first line is a hint for text editors
+# IBM_PROLOG_BEGIN_TAG
+# This is an automatically generated prolog.
+#
+# $Source: configs/odyssey/dd1/ody_pnor_dd1_lab_image_config $
+#
+# IBM CONFIDENTIAL
+#
+#
+# COPYRIGHT 2023
+# [+] International Business Machines Corp.
+#
+#
+# The source code for this program is not published or otherwise
+# divested of its trade secrets, irrespective of what has been
+# deposited with the U.S. Copyright Office.
+#
+# IBM_PROLOG_END_TAG
+
+{
+    # ekbRoot can be overridden by passing repo path into imageBuild.py using --ekb
+    'ekbRoot'   : '/tmp/ekb-src',
+    # ekbCommit only matters if --build option is used on imageBuild.py
+    'ekbCommit' : 'main',
+    # ekb workon/build commands
+    'ekbWorkon' : './ekb workon',
+    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build odyssey.10.sppe.ram.pak\n',
+
+    # sbeRoot can be overridden by passing repo path into imageBuild.py using --sbe
+    'sbeRoot'   : '/tmp/sbe',
+    # sbeCommit only matters if --build option is used on imageBuild.py
+    'sbeCommit' : 'main',
+    # sbe workon/build commands
+    'sbeWorkon' : './sbe workon odysseylab pnor',
+    'sbeBuild'  : 'source env.bash\nmesonwrap setup\nmesonwrap build\n./sbe clean\n./sbe build\n',
+
+    # Concatinate specified number of generated images to finalImage (Probably pnor only)
+    'concat'  : 3,
+
+    # Definition of sections
+    'image_sections' : {
+        # output pak name
+        'boot' : {
+            # Location of archive(s) needed to build this section. Muliple archives are merged
+            'archives' : ['%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak'],
+
+            # 'files' is a list of essential archive entries (files). Intended to generate
+            # place holders for content that may not yet exist in the archives that
+            # make up this section.
+            # They are generated with zero data length if content location doesn't exist.
+            # storage method is 'store' (no compression)
+            # (EntryName, content location), ...
+            'files' : [('part.tbl','%gen%/part.tbl')],
+
+            # Size of the partion in the generated image - padded if needed
+            'partition_size' : 0x20000,
+            # Generate a hash list called hash.list and add it to this image section and run signimage tool
+            'hashlist' : 'hash.list',
+            # location (subdir) in PAK file for hash and sign files.
+            'hashpath' : 'boot',
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'rt' : {
+            # Location of archive(s) needed to build this section. Muliples are merged.
+            'archives' : ['%sbeImageDir%/odysseylab/runtime/sppe/odyssey_sppe_DD1.pak',
+                          '%ekbImageDir%/pak/odyssey/10/odyssey.10.sppe.ram.pak'],
+
+            'partition_size' : 0xC0000,
+            # Generate a hash list called hash.list and add it to this image section and run signimage tool
+            'hashlist' : 'hash.list',
+            # location (dir) inside PAK file for hash and sign files
+            'hashpath' : 'rt',
+            'noHash'   : ['info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'bmc' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/bmc.pak'],
+
+            # 'files' is a list of essential archive entries (files). Intended to generate
+            # place holders for content that may not yet exist in the archives that
+            # make up this section.
+            # They are generated with zero data length if content file doesn't exist.
+            # storage method is 'store' (no compression)
+            # (EntryName, content location), ...
+            'files' : [('bmc/attr.ovrd','EMPTY'),],
+
+            'partition_size' : 0x8000,
+            # not signed - don't provide hashlist
+            'noHash' : ['bmc/info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'host' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/host.pak'],
+
+            'files' : [('host/attr.ovrd','EMPTY'),],
+
+            'partition_size' : 0x8000,
+            # not signed - don't specify hashlist
+            'noHash' : ['host/info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'rsvd' : {
+            # replace this with the real archive when it exists
+            'archives' : [],
+            'files' : [('rsvd','EMPTY'),],
+            'partition_size' : 0x300000,
+        },
+
+        'cust' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/cust.pak'],
+
+            'partition_size' : 0x10000,
+            # not signed - don't specify hashlist
+            'noHash' : ['cust/info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+    },
+}

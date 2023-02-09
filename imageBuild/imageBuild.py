@@ -159,7 +159,7 @@ def setupRepository(basePath, commit,remote):
     with subprocess.Popen(cmd.split(),stdin=subprocess.PIPE) as proc:
         proc.communicate(input=str.encode(build_cmd))
         if proc.returncode != 0:
-            print("Building %s had a returcode %d" % (
+            print("Building %s had a returncode %d" % (
                 basePath,
                 proc.returncode),
                 file=sys.stderr)
@@ -557,7 +557,7 @@ if os.path.exists(sbeImageTool):
     resp = subprocess.run(cmd.split())
     if resp.returncode != 0:
         print("%s failed with rc %d" % (cmd,resp.returncode))
-        sys.exit(resp.returcode)
+        sys.exit(resp.returncode)
     else:
         stub_cp(signImgSrc, signedDir)
 
