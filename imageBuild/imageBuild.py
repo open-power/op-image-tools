@@ -463,6 +463,12 @@ replacement_tags = {
 # Merge archives where more than one exists in an image section
 partitions = []
 for sectionName, info in section_info.items():
+    partitions.append((sectionName, info['partition_size']))
+
+# Create partitions file and build partition table
+partitionsfile = buildPartitionTable(partitions)
+
+for sectionName, info in section_info.items():
     archives    = []
     baseEntries = []
 
@@ -486,10 +492,7 @@ for sectionName, info in section_info.items():
 
     # merge archives
     section_info[sectionName]['mergedArchive'] = mergeArchives(sectionName, archives, baseEntries)
-    partitions.append((sectionName, info['partition_size']))
 
-# Create partitions file and build partion table
-partitionsfile = buildPartitionTable(partitions)
 
 # Add signature/hash to sections that require it
 signImgSrc = {}
