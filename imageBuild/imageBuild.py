@@ -389,9 +389,15 @@ if 'concat' in config.keys():
 if concatCopies > 1:
     singleImagefile = os.path.join(output,"single_" + args.name)
 
+if os.path.exists(imagefile):
+    os.remove(imagefile)
+if os.path.exists(singleImagefile):
+    os.remove(singleImagefile)
 
 genDir = os.path.join(output,'gen')
-os.makedirs(genDir,exist_ok=True)
+if os.path.exists(genDir):
+    shutil.rmtree(genDir)
+os.makedirs(genDir)
 
 # Required before calling pak tools
 sys.path.append("%s/pymod" % pakToolsDir)
@@ -521,10 +527,6 @@ for sectionName, info in section_info.items():
 
         # hashname in archive
         archivefn = os.path.join(hashpath,hashlist)
-
-        # full path filesystem
-        outhash = os.path.join(output, hashpath)
-        os.makedirs(outhash,exist_ok=True)
 
         # create hash list and add it to the archive
         makeHashList(pakname, archivefn)
