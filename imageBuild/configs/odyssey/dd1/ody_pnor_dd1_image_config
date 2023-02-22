@@ -26,7 +26,7 @@
     'ekbCommit' : 'main',
     # ekb workon/build commands
     'ekbWorkon' : './ekb workon',
-    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build odyssey.10.sppe.ram.pak\n',
+    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build -j 1 odyssey.10.sppe.ram.pak\n',
 
     # sbeRoot can be overridden by passing repo path into imageBuild.py using --sbe
     'sbeRoot'   : '~/sandbox/p11/sbe',
