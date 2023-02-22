@@ -54,7 +54,7 @@
             'files' : [('part.tbl','%gen%/part.tbl')],
 
             # Size of the partion in the generated image - padded if needed
-            'partition_size' : 0x20000,
+            'partition_size' : 0x40000,   # 256 KiB
             # Generate a hash list called hash.list and add it to this image section and run signimage tool
             'hashlist' : 'hash.list',
             # location (subdir) in PAK file for hash and sign files.
@@ -67,7 +67,7 @@
             'archives' : ['%sbeImageDir%/odysseylab/runtime/sppe/odyssey_sppe_DD1.pak',
                           '%ekbImageDir%/pak/odyssey/10/odyssey.10.sppe.ram.pak'],
 
-            'partition_size' : 0xC0000,
+            'partition_size' : 0x340000,  # 3.25 MiB
             # Generate a hash list called hash.list and add it to this image section and run signimage tool
             'hashlist' : 'hash.list',
             # location (dir) inside PAK file for hash and sign files
@@ -88,7 +88,7 @@
             # (EntryName, content location), ...
             'files' : [('bmc/attr.ovrd','EMPTY'),],
 
-            'partition_size' : 0x8000,
+            'partition_size' : 0x40000,   # 256 KiB
             # not signed - don't provide hashlist
             'noHash' : ['bmc/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
@@ -100,28 +100,10 @@
 
             'files' : [('host/attr.ovrd','EMPTY'),],
 
-            'partition_size' : 0x8000,
+            'partition_size' : 0x40000,   # 256 KiB
             # not signed - don't specify hashlist
             'noHash' : ['host/info.txt'],
             # Generate a image hash for this section by using sbe imageTool
             'imagehash': 'image.hash',
         },
-        'rsvd' : {
-            # replace this with the real archive when it exists
-            'archives' : [],
-            'files' : [('rsvd','EMPTY'),],
-            'partition_size' : 0x300000,
-        },
-
-        'cust' : {
-            # Location of archive(s) needed to build this section
-            'archives' : ['%imageToolDir%/defaults/cust.pak'],
-
-            'partition_size' : 0x10000,
-            # not signed - don't specify hashlist
-            'noHash' : ['cust/info.txt'],
-            # Generate a image hash for this section by using sbe imageTool
-            'imagehash': 'image.hash',
-        },
-    },
 }
