@@ -142,13 +142,18 @@ def setupRepository(basePath, commit,remote):
     if 'sbe' in remote:
         cmd= config['sbeWorkon']
         build_cmd=config['sbeBuild']
+        if (args.devready or args.devreadysbe):
+            if not args.nobranchchange:
+                getDevReadyCommits('sbe', commit)
+            else:
+                print("Not getting dev-ready updates because --nobranchchange was specified")
 
     elif 'ekb' in remote:
         cmd= config['ekbWorkon']
         build_cmd= config['ekbBuild']
-        if args.devready:
+        if (args.devready or args.devreadyekb):
             if not args.nobranchchange:
-                getDevReadyCommits(commit)
+                getDevReadyCommits('ekb', commit)
             else:
                 print("Not getting dev-ready updates because --nobranchchange was specified")
     else:
@@ -185,14 +190,19 @@ def buildPartitionTable(partitions):
 
     return partitionsfile
 
-def getDevReadyCommits(commit):
-    print("\nRunning ./ekb cronus checkout")
-    dev_out, err = subprocess.Popen(['source ./env.bash; ./ekb cronus checkout --branch', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()
+def getDevReadyCommits(repo, commit):
+    print("\nRunning ./", repo, " cronus checkout")
+    if (repo == 'sbe'):
+        dev_out_file = 'cro_ody_sbe_image_cronus_checkout.sversion'
+        dev_out, err = subprocess.Popen(['export PROJECT_NAME=sbe; export SBEROOT=`pwd` export SBEROOT_INT=`pwd`/internal; export SBE_INSIDE_WORKON=1; source ./internal/projectrc; ./sbe cronus_devready checkout; unset SBE_INSIDE_WORKON; unset PROJECT_NAME; unset SBEROOT; unset SBEROOT_INT;'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()
+    else:
+        dev_out_file = 'cro_ody_ekb_image_cronus_checkout.sversion'
+        dev_out, err = subprocess.Popen(['source ./env.bash; ./ekb cronus checkout --branch', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()
     # Sometimes seeing stuff in stderr that isn't actually an error, so not going to fail
     if err:
         print("INFO: stderr returned:\n", err)
 
-    print("ekb cronus checkout --branch", commit, "\n")
+    print(repo, " cronus checkout --branch", commit, "\n")
     print(dev_out)
 
     # look for explicit problems
@@ -208,7 +218,7 @@ def getDevReadyCommits(commit):
         sys.exit(1)
 
     # write output to a file
-    filename = os.path.join(output, "cro_image_cronus_checkout.sversion")
+    filename = os.path.join(output, dev_out_file)
     outfile = open(filename, 'w')
     outfile.write(dev_out)
     outfile.close()
@@ -296,7 +306,11 @@ parser.add_argument('--update', action='store_true',
                     help='After changing to specified branch, '
                     'update it from the server as well')
 parser.add_argument('--devready', action='store_true',
+                    help='Apply dev-ready ekb and sbe commits on top of branch')
+parser.add_argument('--devreadyekb', action='store_true',
                     help='Apply dev-ready ekb commits on top of branch')
+parser.add_argument('--devreadysbe', action='store_true',
+                    help='Apply dev-ready sbe commits on top of branch')
 parser.add_argument('--ekb',default=None,
                     help='Base path of ekb repository. '
                     'Default: use value in configfile')
@@ -353,6 +367,7 @@ sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
 sbeImageDir = os.path.join(sbeBase,'images')
 
 output    = os.path.abspath(args.output)
+os.makedirs(output,exist_ok=True)
 
 cwd = os.getcwd()
 # setup git repos and build - only if --build option specified.
