@@ -468,7 +468,9 @@ out.setConsoleLevel(out.levels.CRITICAL)
 
 section_info = config['image_sections']
 
-#### build stages
+#### Build stages
+####    Note : Below stage will be skipped if section is configured with 'signed_image'
+####           since SBE provides frozen signed images so tool should not attempt to sign.
 stage1 = 'merged'
 stage2 = 'signed'
 stage3 = 'final'  #hashed
@@ -501,6 +503,10 @@ for sectionName, info in section_info.items():
 partitionsfile = buildPartitionTable(partitions)
 
 for sectionName, info in section_info.items():
+    if 'signed_image' in info.keys():
+        print(f"INFO: Use configured signed image for '{sectionName}' so no signing...")
+        continue
+
     archives    = []
     baseEntries = []
 
@@ -534,7 +540,7 @@ asisImgSrc = {}
 notHashed = {}
 
 for sectionName, info in section_info.items():
-    if not info['mergedArchive']:
+    if 'mergedArchive' not in info.keys():
         continue
 
     pakname = info['mergedArchive']
@@ -626,14 +632,30 @@ if os.path.exists(sbeImageTool):
 
 stub_cp(asisImgSrc, finalDir)
 
+# Use configured 'signed_image' as 'finalArchive' to pack since signing were
+# skipped for those image sections
+for sectionName, info  in section_info.items():
+    if 'signed_image' in info.keys():
+        print(f"INFO: Copy the configured signed image for '{sectionName}' as final image...")
+        signedImgPath = info['signed_image']
+        for key,value in replacement_tags.items():
+            signedImgPath = signedImgPath.replace(key,value)
+
+        finalArchivePath  = os.path.join(finalDir, f"{sectionName}.pak")
+        shutil.copy(signedImgPath, finalArchivePath)
+        section_info[sectionName]['finalArchive'] = finalArchivePath
+
 # Create image
 cmd = "%s build-image %s %s" % (flashBuildTool, partitionsfile, singleImagefile)
+
 #----------------------------
 # Restore images not hashed
 #----------------------------
 for sectionName, info  in section_info.items():
-    archive = notHashed[sectionName]
-    restoreSaved(info['finalArchive'], archive)
+    if sectionName in notHashed.keys():
+        archive = notHashed[sectionName]
+        restoreSaved(info['finalArchive'], archive)
+
     cmd = "%s -p %s=%s" % (cmd, sectionName, info['finalArchive'])
 #print(cmd)
 #-------------------------

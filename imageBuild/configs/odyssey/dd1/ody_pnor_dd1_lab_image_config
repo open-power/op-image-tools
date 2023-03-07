@@ -42,6 +42,10 @@
     'image_sections' : {
         # output pak name
         'boot' : {
+            # If this option is added with image that will get used blindly
+            # to pack as final NOR and updatable image without signing and hashing.
+            'signed_image' : '%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak',
+
             # Location of archive(s) needed to build this section. Muliple archives are merged
             'archives' : ['%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak'],
 
