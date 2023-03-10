@@ -328,6 +328,8 @@ parser.add_argument('--pakToolDir',default=None,
                     help='Directory of PAK tools. '
                     'Only required if not using valid SBE/EKB. '
                     'Default is to look for PAK tools in SBE/EKB repositories')
+parser.add_argument('--sbe_test',action='store_true',
+                    help='Run sbe test cases to validate the images')
 args = parser.parse_args()
 
 # process the configuration file and load needed modules whos location is based on
@@ -653,10 +655,30 @@ if resp.returncode != 0:
     print("ecc failed with rc %d" % resp.returncode)
     sys.exit(resp.returncode)
 
+#--------------------------
+# Run SBE test cases
+#--------------------------
+if args.sbe_test:
+    print("------------------------")
+    print("Running SBE test cases")
+    print("------------------------")
+    if not os.path.exists(sbeBase):
+        print(f"{sbeBase} is not exist", file=sys.stderr)
+        sys.exit(1)
+    elif not os.path.exists(os.path.join(sbeBase, "internal")):
+        print(f"Not found 'internal' directory in {sbeBase} to run test cases")
+        sys.exit(1)
 
+    os.chdir(sbeBase)
 
+    workon_cmd = config['sbeWorkon']
+    runtest_cmd = f"./sbe runtest {output}"
+    with subprocess.Popen(workon_cmd.split(),stdin=subprocess.PIPE) as proc:
+        proc.communicate(input=str.encode(runtest_cmd))
+        if proc.returncode != 0:
+            print(f"SBE test cases is failed, returncode: {proc.returncode}",
+                  file=sys.stderr)
+            os.chdir(cwd)
+            sys.exit(1)
 
-
-
-
-
+    os.chdir(cwd)
