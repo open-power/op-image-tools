@@ -34,7 +34,7 @@
     'sbeCommit' : 'main',
     # sbe workon/build commands
     'sbeWorkon' : './sbe workon odyssey pnor',
-    'sbeBuild'  : 'source env.bash\nmesonwrap setup\nmesonwrap build\n./sbe clean\n./sbe build\n',
+    'sbeBuild'  : './sbe clean\n./sbe build\n',
 
     # Concatinate specified number of generated images to finalImage (Probably pnor only)
     'concat'  : 3,
