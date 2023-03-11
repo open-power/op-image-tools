@@ -330,6 +330,9 @@ parser.add_argument('--pakToolDir',default=None,
                     'Default is to look for PAK tools in SBE/EKB repositories')
 parser.add_argument('--sbe_test',action='store_true',
                     help='Run sbe test cases to validate the images')
+parser.add_argument('--build_workdir', type=str,
+                    help='Work directory for the build. '
+                    'Tool will ignore xxxxRoot configure parameter value.')
 args = parser.parse_args()
 
 # process the configuration file and load needed modules whos location is based on
@@ -355,7 +358,10 @@ if not target_arch:
 ## ekb base
 ekbBase = args.ekb
 if not ekbBase:
-    ekbBase = config['ekbRoot']
+    if args.build_workdir:
+        ekbBase = os.path.abspath(os.path.join(args.build_workdir, 'ekb'))
+    else:
+        ekbBase = config['ekbRoot']
 
 ekbBase = os.path.realpath(os.path.expanduser(ekbBase))
 ekbImageDir = "%s/output/images/%s" % (ekbBase, target_arch)
@@ -363,7 +369,10 @@ ekbImageDir = "%s/output/images/%s" % (ekbBase, target_arch)
 ## sbe base
 sbeBase = args.sbe
 if not sbeBase:
-    sbeBase = config['sbeRoot']
+    if args.build_workdir:
+        sbeBase = os.path.abspath(os.path.join(args.build_workdir, 'sbe'))
+    else:
+        sbeBase = config['sbeRoot']
 
 sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
 sbeImageDir = os.path.join(sbeBase,'images')
