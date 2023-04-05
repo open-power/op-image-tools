@@ -42,6 +42,12 @@
     # Definition of sections
     'image_sections' : {
         # output pak name
+        'debug' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/debug.pak'],
+
+            'partition_size' : 0xE0A8, # 56.16 KiB
+        },
         'boot' : {
             # Location of archive(s) needed to build this section. Muliple archives are merged
             'archives' : ['%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak'],
@@ -55,7 +61,7 @@
             'files' : [('part.tbl','%gen%/part.tbl')],
 
             # Size of the partion in the generated image - padded if needed
-            'partition_size' : 0x40000,   # 256 KiB
+            'partition_size' : 0x31F58,   # 199.83 KiB
             # Generate a hash list called hash.list and add it to this image section and run signimage tool
             'hashlist' : 'hash.list',
             # location (subdir) in PAK file for hash and sign files.
