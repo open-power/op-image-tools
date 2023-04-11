@@ -36,7 +36,10 @@
     'sbeBuild'  : './sbe clean\n./sbe build\n',
 
     # Concatinate specified number of generated images to finalImage (Probably pnor only)
-    'concat'  : 3,
+    'concat'  : 2,
+
+    # Pull golden image from sbe image directory to add in the final NOR image
+    'golden_image' : '%sbeImageDir%/odysseylab/golden_odyssey_nor_DD1.img',
 
     # Definition of sections
     'image_sections' : {

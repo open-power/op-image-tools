@@ -674,6 +674,17 @@ if concatCopies > 1:
         f = open(singleImagefile, 'rb')
         f1.write(f.read())
         f.close()
+
+    if 'golden_image' in config.keys():
+        print("INFO: Using configured golden image to pack in the NOR image")
+        goldenImgPath = config['golden_image']
+        for key,value in replacement_tags.items():
+            goldenImgPath = goldenImgPath.replace(key,value)
+
+        goldenImgFd = open(goldenImgPath, 'rb')
+        f1.write(goldenImgFd.read())
+        goldenImgFd.close()
+
     f1.close()
 
 #--------------------------
