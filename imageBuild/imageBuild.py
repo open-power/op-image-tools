@@ -333,6 +333,10 @@ parser.add_argument('--sbe_test',action='store_true',
 parser.add_argument('--build_workdir', type=str,
                     help='Work directory for the build. '
                     'Tool will ignore xxxxRoot configure parameter value.')
+parser.add_argument('--buildGoldenImg', type=int, metavar="SIDE_COUNT",
+                    help='Use to build golden image with the side count '
+                         'instead of the configured frozen golden image.'
+                         'The golden image will be used for the given sides.')
 args = parser.parse_args()
 
 # process the configuration file and load needed modules whos location is based on
@@ -669,13 +673,18 @@ if resp.returncode != 0:
 if concatCopies > 1:
     shutil.copyfile(singleImagefile, imagefile)
 
+    if args.buildGoldenImg:
+        print(f"INFO: Using the custom golden image for the given "
+              f"side count [{args.buildGoldenImg}]")
+        concatCopies = args.buildGoldenImg
+
     f1 = open(imagefile, 'ab+')
     for i in range(concatCopies-1):
         f = open(singleImagefile, 'rb')
         f1.write(f.read())
         f.close()
 
-    if 'golden_image' in config.keys():
+    if 'golden_image' in config.keys() and not args.buildGoldenImg:
         print("INFO: Using configured golden image to pack in the NOR image")
         goldenImgPath = config['golden_image']
         for key,value in replacement_tags.items():
