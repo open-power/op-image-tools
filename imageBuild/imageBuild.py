@@ -333,6 +333,13 @@ parser.add_argument('--sbe_test',action='store_true',
 parser.add_argument('--build_workdir', type=str,
                     help='Work directory for the build. '
                     'Tool will ignore xxxxRoot configure parameter value.')
+parser.add_argument('--buildGoldenImg', type=int, metavar="SIDE_COUNT",
+                    help='Use to build golden image with the side count '
+                         'instead of the configured frozen golden image.'
+                         'The golden image will be used for the given sides.')
+parser.add_argument('--allowToSign', action='store_true',
+                    help='Use to allow the signing process for the frozen '
+                         'configured image_sections.')
 args = parser.parse_args()
 
 # process the configuration file and load needed modules whos location is based on
@@ -470,7 +477,8 @@ section_info = config['image_sections']
 
 #### Build stages
 ####    Note : Below stage will be skipped if section is configured with 'signed_image'
-####           since SBE provides frozen signed images so tool should not attempt to sign.
+####           and '--allowToSign' option is not passed since the SBE provides
+####           frozen signed images so tool should not attempt to sign.
 stage1 = 'merged'
 stage2 = 'signed'
 stage3 = 'final'  #hashed
@@ -503,7 +511,7 @@ for sectionName, info in section_info.items():
 partitionsfile = buildPartitionTable(partitions)
 
 for sectionName, info in section_info.items():
-    if 'signed_image' in info.keys():
+    if 'signed_image' in info.keys() and not args.allowToSign:
         print(f"INFO: Use configured signed image for '{sectionName}' so no signing...")
         continue
 
@@ -635,7 +643,7 @@ stub_cp(asisImgSrc, finalDir)
 # Use configured 'signed_image' as 'finalArchive' to pack since signing were
 # skipped for those image sections
 for sectionName, info  in section_info.items():
-    if 'signed_image' in info.keys():
+    if 'signed_image' in info.keys() and not args.allowToSign:
         print(f"INFO: Copy the configured signed image for '{sectionName}' as final image...")
         signedImgPath = info['signed_image']
         for key,value in replacement_tags.items():
@@ -669,13 +677,18 @@ if resp.returncode != 0:
 if concatCopies > 1:
     shutil.copyfile(singleImagefile, imagefile)
 
+    if args.buildGoldenImg:
+        print(f"INFO: Using the custom golden image for the given "
+              f"side count [{args.buildGoldenImg}]")
+        concatCopies = args.buildGoldenImg
+
     f1 = open(imagefile, 'ab+')
     for i in range(concatCopies-1):
         f = open(singleImagefile, 'rb')
         f1.write(f.read())
         f.close()
 
-    if 'golden_image' in config.keys():
+    if 'golden_image' in config.keys() and not args.buildGoldenImg:
         print("INFO: Using configured golden image to pack in the NOR image")
         goldenImgPath = config['golden_image']
         for key,value in replacement_tags.items():
