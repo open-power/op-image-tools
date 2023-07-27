@@ -84,20 +84,21 @@ def mergeArchives(sectionName, archiveFileList, baseEntries):
 def setupRepository(basePath, commit,remote):
     print("basePath: %s" % basePath)
     if not os.path.exists(basePath):
-        #Download repo
-        print("git repo %s does not exist. Attempting to clone it" % basePath)
-        basePath=basePath.rstrip('/')
-        (dir,repo_name) = os.path.split(basePath)
-        os.makedirs(dir,exist_ok=True)
-        os.chdir(dir)
-        print("cwd: %s  repo: %s" % (os.getcwd(),repo_name))
-        cmd = 'git clone -b %s ssh://gerrit-server/%s %s -o gerrit' % (commit, remote, repo_name)
-        print(cmd)
-        resp = subprocess.run(cmd.split())
-        if resp.returncode != 0:
-            print("git clone failed with rc %d" % resp.returncode)
-            os.chdir(cwd)
-            sys.exit(1)
+        if not args.no_downloads:
+            #Download repo
+            print("git repo %s does not exist. Attempting to clone it" % basePath)
+            basePath=basePath.rstrip('/')
+            (dir,repo_name) = os.path.split(basePath)
+            os.makedirs(dir,exist_ok=True)
+            os.chdir(dir)
+            print("cwd: %s  repo: %s" % (os.getcwd(),repo_name))
+            cmd = 'git clone -b %s ssh://gerrit-server/%s %s -o gerrit' % (commit, remote, repo_name)
+            print(cmd)
+            resp = subprocess.run(cmd.split())
+            if resp.returncode != 0:
+                print("git clone failed with rc %d" % resp.returncode)
+                os.chdir(cwd)
+                sys.exit(1)
 
     if not os.path.exists(os.path.join(basePath,'.git')):
         print("%s is not a git repositry" % basePath,file=sys.stderr)
@@ -282,6 +283,99 @@ def stub_cp(src, dir):
         cmd = "cp %s %s/" % (f,dir)
         resp = subprocess.run(cmd.split())
 
+def download(url, dir):
+    os.makedirs(dir,exist_ok=True)
+    cmd = f"wget {url} -P {dir}"
+    print(cmd)
+    resp = subprocess.run(cmd.split())
+    if resp.returncode != 0:
+        print(f"{cmd} failed with rc {resp.returncode}")
+        sys.exit(resp.returncode)
+    return os.path.join(dir,os.path.basename(url))
+
+def downloadBinaries(output):
+    cwd = os.getcwd()
+    binariesDir=os.path.join(output,"binaries")
+    if os.path.exists(binariesDir):
+        shutil.rmtree(binariesDir)
+    os.makedirs(binariesDir)
+    downloads = os.path.join(output,"downloads")
+    if os.path.exists(downloads):
+        shutil.rmtree(downloads)
+    os.makedirs(downloads)
+    if 'binaries' in config.keys():
+        repoName = "released"
+        repoPath = os.path.join(downloads,repoName)
+        os.chdir(downloads)
+        cmds=config['binaries']['repository']
+        for cmd in cmds:
+            if cmd.startswith('git clone'):
+                cmd = f"{cmd} {repoName}"
+            print(cmd)
+            resp=subprocess.run(cmd.split())
+            if resp.returncode != 0:
+                os.chdir(cwd)
+                print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+                sys.exit(resp.returncode)
+
+        os.chdir(cwd)
+        files = config['binaries']['files']
+        for file,commit in files:
+            if commit != '':
+                print(f"INFO: Checking out {commit}")
+                cmd = f"git -C {repoPath} checkout {commit}"
+                resp=subprocess.run(cmd.split(),stderr=subprocess.PIPE)
+                if resp.returncode != 0:
+                    print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+                    sys.exit(resp.returncode)
+            srcpath=os.path.join(repoPath,file)
+            dstpath=os.path.join(binariesDir,os.path.basename(file))
+            cmd = f"cp {srcpath} {dstpath}"
+            resp=subprocess.run(cmd.split())
+            if resp.returncode != 0:
+                print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+                sys.exit(resp.returncode)
+    else:
+        os.makedirs(binariesDir,exist_ok=True)
+
+    # create binaries map
+    binaries = {}
+    files = os.listdir(binariesDir)
+    for f in files:
+        fullpath= os.path.join(binariesDir,f)
+        if os.path.isfile(fullpath):
+            binaries[f] = fullpath
+    return (binariesDir,binaries)
+
+def resolveFile(fpath, replacement_tags, overrides, binaries):
+    # replace tags
+    for key,value in replacement_tags.items():
+        fpath = fpath.replace(key,value)
+    # First look for the file in the overrides
+    # If not there then check fpath
+    # If not there then look in binaries
+    fname =  os.path.basename(fpath)
+    if fname in overrides.keys():
+        newPath = overrides[fname]
+    elif os.path.exists(fpath):
+        newPath = fpath
+    elif fname in binaries.keys():
+        newPath = binaries[fname]
+    else:
+        print(f"ERROR Required file not found: {fname}")
+        sys.exit(1)
+
+    tgzext = '.tar.gz'
+    if newPath.endswith(tgzext):
+        # untar tar -C binaries -xzf binaries/sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz
+        tar = tarfile.open(newPath)
+        # TODO might want to consider case where newPath is in an unwriteable location
+        tar.extractall(os.path.dirname(newPath))
+        newPath=newPath[:-len(tgzext)]
+    print(f"INFO: Using {newPath}")
+    return newPath
+
+
 ############################################################
 # Main - Main - Main - Main - Main - Main - Main - Main
 ############################################################
@@ -298,8 +392,9 @@ examples:
 parser.add_argument('configfile',
                     help="The configuration file used to build the image.")
 parser.add_argument('-b','--build',action='store_true',
-                    help='Download repos (if not found), '
-                    'then checkout commit and build it')
+                    help='Downloads ekb and sbe repositories (if not found), '
+                    'then checks out branchs and builds them. Note: Requires --ekb and --sbe,'
+                    ' or --build_workdir')
 parser.add_argument('--nobranchchange', action='store_true',
                     help="Don't change the branch when building")
 parser.add_argument('--update', action='store_true',
@@ -312,13 +407,15 @@ parser.add_argument('--devreadyekb', action='store_true',
 parser.add_argument('--devreadysbe', action='store_true',
                     help='Apply dev-ready sbe commits on top of branch')
 parser.add_argument('--ekb',default=None,
-                    help='Base path of ekb repository. '
-                    'Default: use value in configfile')
+                    help='Base path of the ekb git repository.'
+                    ' Use --ekb_images instead for pre-built images')
+parser.add_argument('--ekb_images',default=None,
+                    help='Image directory of pre-built ekb images.')
 parser.add_argument('--sbe',default=None,
-                    help='Base path of sbe repository. Default: use value '
+                    help='Base path of sbe repository or sbe images. Default: use value '
                     'in configfile')
 parser.add_argument('--ovrd',default=None,
-                    help='Directory to look for override archive source files.'
+                    help='Directory to look for override source files.'
                     ' Files must have same name as those being overridden')
 parser.add_argument('-o','--output', default='./image_output',
                     help='output directory. default ./image_output')
@@ -326,8 +423,8 @@ parser.add_argument('-n','--name', default='image.bin',
                     help='output image filename. default: image.bin')
 parser.add_argument('--pakToolDir',default=None,
                     help='Directory of PAK tools. '
-                    'Only required if not using valid SBE/EKB. '
-                    'Default is to look for PAK tools in SBE/EKB repositories')
+                    'PAK tool override. Only required if PAK tools not available in '
+                    'ekb,sbe,or sbe_tools.')
 parser.add_argument('--sbe_test',action='store_true',
                     help='Run sbe test cases to validate the images')
 parser.add_argument('--build_workdir', type=str,
@@ -340,6 +437,8 @@ parser.add_argument('--buildGoldenImg', type=int, metavar="SIDE_COUNT",
 parser.add_argument('--allowToSign', action='store_true',
                     help='Use to allow the signing process for the frozen '
                          'configured image_sections.')
+parser.add_argument('--no_downloads', action='store_true',
+                    help='Disable downloading any repositories/binaries etc.')
 args = parser.parse_args()
 
 # process the configuration file and load needed modules whos location is based on
@@ -348,6 +447,8 @@ configFile = os.path.abspath(args.configfile)
 if(not os.path.exists(configFile)):
     print("The given config file: '%s', does not exist!" % configFile, file=sys.stderr)
     sys.exit(1)
+
+cwd = os.getcwd()
 
 configdir = os.path.dirname(configFile)
 
@@ -362,46 +463,109 @@ target_arch = os.environ.get("ECMD_ARCH")
 if not target_arch:
     target_arch = exe_arch
 
+output    = os.path.abspath(args.output)
+os.makedirs(output,exist_ok=True)
+
+if args.ekb and args.ekb_images:
+    print("ERROR Can't use --ekb and --ekb_images together.")
+    sys.exit(1)
+
+if not args.ekb and not args.ekb_images and not args.ovrd:
+    print("ERROR Needs to specify either --ekb or --ekb_images or --ovrd")
+    sys.exit(1)
+
+if args.build and not args.ekb:
+    print("ERROR --build requires --ekb")
+    sys.exit(1)
+
 ## ekb base
 ekbBase = args.ekb
-if not ekbBase:
-    if args.build_workdir:
-        ekbBase = os.path.abspath(os.path.join(args.build_workdir, 'ekb'))
-    else:
-        ekbBase = config['ekbRoot']
+ekbImageDir = ''
 
-ekbBase = os.path.realpath(os.path.expanduser(ekbBase))
-ekbImageDir = "%s/output/images/%s" % (ekbBase, target_arch)
+if ekbBase:
+    ekbBase = os.path.realpath(os.path.expanduser(ekbBase))
+    ekbImageDir = config['ekbImageSubDir'].replace('%machine_arch%',target_arch)
+    ekbImageDir = os.path.join(ekbBase,ekbImageDir)
+else:
+    if args.ekb_images:
+        ekbBase = args.ekb_images
+    else:
+        ekbBase = args.ovrd
+
+    ekbBase = os.path.realpath(os.path.expanduser(ekbBase))
+    ekbImagDir = ekbBase
 
 ## sbe base
 sbeBase = args.sbe
 if not sbeBase:
     if args.build_workdir:
         sbeBase = os.path.abspath(os.path.join(args.build_workdir, 'sbe'))
-    else:
+    elif 'sbeRoot' in config.keys():
         sbeBase = config['sbeRoot']
+    else:
+        print("Critical! No path to sbe repository")
+        sys.exit(1)
 
 sbeBase = os.path.realpath(os.path.expanduser(sbeBase))
 sbeImageDir = os.path.join(sbeBase,'images')
 
-output    = os.path.abspath(args.output)
-os.makedirs(output,exist_ok=True)
-
-cwd = os.getcwd()
 # setup git repos and build - only if --build option specified.
 if args.build:
     setupRepository(ekbBase, config['ekbCommit'],'hw/ekb-src')
     setupRepository(sbeBase, config['sbeCommit'],'hw/sbe')
 os.chdir(cwd)
 
+## Load overrides
+overrides = {}
+if args.ovrd:
+    path = os.path.realpath(os.path.expanduser(args.ovrd))
+    if os.path.exists(path):
+        files = os.listdir(path)
+        for f in files:
+            fullpath = os.path.join(path,f)
+            if os.path.isfile(fullpath):
+                overrides[f] = fullpath
+    else:
+        print("WARN override directory does not exist: %s" % path)
+
+## Load released binaries
+binariesDir = ''
+binaries = {}
+if not args.no_downloads:
+    binariesDir,binaries = downloadBinaries(output)
+
+# Untar sbe_tools.tar.gz to get sbe tools
+sbeToolsTar = config['sbeTools']
+if(sbeToolsTar in overrides.keys()):
+    sbeToolsTar = overrides[sbeToolsTar]
+else:
+    sbeToolsTar = os.path.join(sbeImageDir, sbeToolsTar)
+
+sbeTools = tarfile.open(sbeToolsTar)
+sbeTools.extractall(output)
+sbeToolsDir = os.path.join(output,'sbe_tools')
+sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
+
+sbeEccTool = os.path.join(sbeToolsDir,'ecc')
+if not os.path.exists(sbeEccTool):
+    print("ERROR: %s does not exist. Make sure SBE is current" % sbeEccTool)
+    sys.exit(1)
+
+
 ## pak tools
 pakToolsDir = args.pakToolDir
 if(pakToolsDir):
     pakToolsDir = os.path.realpath(os.path.expanduser(pakToolsDir))
 else:
+    # First, look in sbe tools
+    # TODO where under sbeToolsDir will pak tools be?
+    paktoolsDir = os.path.join(sbeToolsDir,'tools')
+if not os.path.exists(os.path.join(paktoolsDir,'paktool')):
+    # Next, look in sbe path
     pakToolsDir = os.path.join(sbeBase,'public','src','import','public',
                                'common','utils','imageProcs','tools')
 if not os.path.exists(pakToolsDir):
+    # Finally, look in ekb path
     pakToolsDir = os.path.join(ekbBase,'public','common','utils',
                                'imageProcs','tools')
     if not os.path.exists(pakToolsDir):
@@ -409,7 +573,6 @@ if not os.path.exists(pakToolsDir):
         sys.exit(1)
 
 imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
-pakBuildTool    = os.path.join(pakToolsDir, 'pakbuild')
 pakTool         = os.path.join(pakToolsDir, 'paktool')
 flashBuildTool  = os.path.join(pakToolsDir, 'flashbuild')
 
@@ -438,38 +601,6 @@ sys.path.append("%s/pymod" % pakToolsDir)
 from output import out
 import pakcore as pak
 
-
-## Load overrides
-overides = {}
-if args.ovrd:
-    path = os.path.realpath(os.path.expanduser(args.ovrd))
-    if os.path.exists(path):
-        files = os.listdir(path)
-        for f in files:
-            fullpath = os.path.join(path,f)
-            if os.path.isfile(fullpath):
-                overides[f] = fullpath
-    else:
-        print("WARN override directory does not exist: %s" % path)
-
-
-# Untar sbe_tools.tar.gz to get sbe tools
-sbeToolsTar = "sbe_tools.tar.gz"
-if(sbeToolsTar in overides.keys()):
-    sbeToolsTar = overides[sbeToolsTar]
-else:
-    sbeToolsTar = os.path.join(sbeImageDir, sbeToolsTar)
-
-sbeTools = tarfile.open(sbeToolsTar)
-sbeTools.extractall(output)
-sbeToolsDir = os.path.join(output,'sbe_tools')
-sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
-
-sbeEccTool = os.path.join(sbeToolsDir,'ecc')
-if not os.path.exists(sbeEccTool):
-    print("ERROR: %s does not exist. Make sure SBE is current" % sbeEccTool)
-    sys.exit(1)
-
 #only print out critical errors. For debug, change CRITICAL to DEBUG
 out.setConsoleLevel(out.levels.CRITICAL)
 
@@ -493,6 +624,7 @@ os.makedirs(finalDir,exist_ok=True)
 
 #
 replacement_tags = {
+        '%binariesDir%'  : binariesDir,
         '%imageToolDir%' : imageToolDir,
         '%ekbImageDir%' : ekbImageDir,
         '%sbeImageDir%' : sbeImageDir,
@@ -500,9 +632,7 @@ replacement_tags = {
         '%gen%'         : genDir,
 }
 
-
-# Resolve archive paths in image_sections
-# Merge archives where more than one exists in an image section
+# Discover partitions
 partitions = []
 for sectionName, info in section_info.items():
     partitions.append((sectionName, info['partition_size']))
@@ -510,6 +640,8 @@ for sectionName, info in section_info.items():
 # Create partitions file and build partition table
 partitionsfile = buildPartitionTable(partitions)
 
+# Resolve archive paths in image_sections
+# Merge archives where more than one exists in an image section
 for sectionName, info in section_info.items():
     if 'signed_image' in info.keys() and not args.allowToSign:
         print(f"INFO: Use configured signed image for '{sectionName}' so no signing...")
@@ -518,16 +650,10 @@ for sectionName, info in section_info.items():
     archives    = []
     baseEntries = []
 
-    # Expand tags
+    # Resolve location of archive images
     for arc in info['archives']:
-        for key,value in replacement_tags.items():
-            arc = arc.replace(key,value)
 
-        arcFileName = os.path.basename(arc)
-        if arcFileName in overides.keys():
-            print("Override:\n%s\n  with\n%s" % (arc,overides[arcFileName]))
-            arc = overides[arcFileName]  ## get full path
-
+        arc = resolveFile(arc, replacement_tags, overrides, binaries)
         archives.append(arc)
 
     if 'files' in info.keys():
@@ -609,7 +735,8 @@ for sectionName, pakFile in signImgSrc.items():
 
 cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
         signPak --pakFiles {pakFilesToSign}"
-print(cmd)
+
+print(f"INFO: signing: {pakFilesToSign}")
 
 if os.path.exists(sbeImageTool):
     resp = subprocess.run(cmd.split())
@@ -628,7 +755,8 @@ for sectionName, pakFile in hashImgSrc.items():
 
 cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
         pakHash --pakFiles {pakFilesToHash}"
-print(cmd)
+
+print(f"INFO: hashing: {pakFilesToHash}")
 
 if os.path.exists(sbeImageTool):
     resp = subprocess.run(cmd.split())
@@ -691,8 +819,8 @@ if concatCopies > 1:
     if 'golden_image' in config.keys() and not args.buildGoldenImg:
         print("INFO: Using configured golden image to pack in the NOR image")
         goldenImgPath = config['golden_image']
-        for key,value in replacement_tags.items():
-            goldenImgPath = goldenImgPath.replace(key,value)
+
+        goldenImgPath = resolveFile(goldenImgPath, replacement_tags, overrides, binaries)
 
         goldenImgFd = open(goldenImgPath, 'rb')
         f1.write(goldenImgFd.read())

@@ -18,28 +18,55 @@
 #
 # IBM_PROLOG_END_TAG
 
-{
-    # ekbRoot can be overridden by passing repo path into imageBuild.py using --ekb
-    'ekbRoot'   : '/tmp/ekb-src',
-    # ekbCommit only matters if --build option is used on imageBuild.py
-    'ekbCommit' : 'main',
-    # ekb workon/build commands
-    'ekbWorkon' : './ekb workon',
-    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build -j 1 INCLUDE_ODY_ATE_FW=1 odyssey.10.sppe.ram.pak\n',
+# NOTE: Reqired source files are first searched for in the directory specified
+# by --ovrd, if given, then in the path provided by this configfile  or
+# passed in as parameters, finally in released binaries dir (binaries), if setup
 
-    # sbeRoot can be overridden by passing repo path into imageBuild.py using --sbe
-    'sbeRoot'   : '/tmp/sbe',
-    # sbeCommit only matters if --build option is used on imageBuild.py
+{
+    # 'ekbImageSubDir' is the subdir under ekb repository of the desired pak archives
+    # It is only used when --ekb parameter is given.
+    # Note: %machine_arch% is either X86_64 or ppc64le
+    'ekbImageSubDir' : 'output/images/%machine_arch%/pak/odyssey/10',
+
+    # 'ekbCommit','ekbworkon','ekbBuild are only used when the --build parameter is specified
+    'ekbCommit' : 'main',
+    'ekbWorkon' : './ekb workon',
+    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build -j 1 odyssey.10.sppe.ram.pak\n',
+
+    # sbeRoot is no longer required. It is used to provide the default path
+    # to the sbe repository when --sbe or --workdir are not provided.
+    # A path to the sbe repository is required for imageBuild.py to function.
+    'sbeRoot'   : '~/sandbox/p11/sbe',
+    # 'sbeCommit','sbeWorkon','sbeBuild' are only used when the --build parameter is specified
     'sbeCommit' : 'main',
-    # sbe workon/build commands
-    'sbeWorkon' : './sbe workon odysseylab pnor',
+    'sbeWorkon' : './sbe workon odyssey pnor',
     'sbeBuild'  : './sbe clean\n./sbe build\n',
+
+    # Name of the sbe Tools tar
+    'sbeTools'  : 'sbe_tools.tar.gz',
+
+    # 'binaries' contains the released binary images (optional), expected to be a git repository
+    # Setup binaries : shell cmd(s) to setup binaries content --depth 1 master-p10 hw072723a.ody sbegold0711_2328.ody
+    'binaries'    :  {
+        'repository' : ['git clone https://github.com/open-power/hostboot-binaries.git --branch master-p10',],
+
+        #          (File to extract into delivered binaries, branch/commit/tag  to use (empty string to use latest commit)),
+        'files' : [('sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz',''),
+                   ('odyssey.10.sppe.ram.pak','')],
+        # Example:
+        #'files' : [('sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz','sbegold0711_2328.ody'),
+        #           ('odyssey.10.sppe.ram.pak','hw072723a.ody')],
+        },
 
     # Concatinate specified number of generated images to finalImage (Probably pnor only)
     'concat'  : 2,
 
-    # Pull golden image from sbe image directory to add in the final NOR image
-    'golden_image' : '%sbeImageDir%/odysseylab/golden_odyssey_nor_DD1.img',
+    # This specifies that the 'golden_image' is to be included within the generated output image.
+    # The 'golden_image' is first searched for in the directory specified by --ovrd, if given,
+    # then in the path specified here, lastly in the released binaries directory.
+    #'golden_image' : 'golden_odyssey_nor_DD1.img',
+    # No golden_image for lab ?
+    # 'golden_image' : '%sbeImageDir%/odyssey/golden_odyssey_nor_DD1.img.tar.gz',
 
     # Definition of sections
     'image_sections' : {
@@ -78,7 +105,7 @@
         'rt' : {
             # Location of archive(s) needed to build this section. Muliples are merged.
             'archives' : ['%sbeImageDir%/odysseylab/runtime/sppe/odyssey_sppe_DD1.pak',
-                          '%ekbImageDir%/pak/odyssey/10/odyssey.10.sppe.ram.pak'],
+                          '%ekbImageDir%/odyssey.10.sppe.ram.pak'],
 
             'partition_size' : 0x340000,  # 3.25 MiB
             # Generate a hash list called hash.list and add it to this image section and run signimage tool
