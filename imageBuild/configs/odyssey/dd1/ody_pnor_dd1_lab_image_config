@@ -31,22 +31,21 @@
     # 'ekbCommit','ekbworkon','ekbBuild are only used when the --build parameter is specified
     'ekbCommit' : 'main',
     'ekbWorkon' : './ekb workon',
-    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build -j 1 odyssey.10.sppe.ram.pak\n',
+    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build -j 1 INCLUDE_ODY_ATE_FW=1 odyssey.10.sppe.ram.pak\n',
 
     # sbeRoot is no longer required. It is used to provide the default path
     # to the sbe repository when --sbe or --workdir are not provided.
     # A path to the sbe repository is required for imageBuild.py to function.
-    'sbeRoot'   : '~/sandbox/p11/sbe',
+    'sbeRoot'   : '/tmp/sbe',
     # 'sbeCommit','sbeWorkon','sbeBuild' are only used when the --build parameter is specified
     'sbeCommit' : 'main',
-    'sbeWorkon' : './sbe workon odyssey pnor',
+    'sbeWorkon' : './sbe workon odysseylab pnor',
     'sbeBuild'  : './sbe clean\n./sbe build\n',
 
     # Name of the sbe Tools tar
     'sbeTools'  : 'sbe_tools.tar.gz',
 
     # 'binaries' contains the released binary images (optional), expected to be a git repository
-    # Setup binaries : shell cmd(s) to setup binaries content --depth 1 master-p10 hw072723a.ody sbegold0711_2328.ody
     'binaries'    :  {
         'repository' : ['git clone https://github.com/open-power/hostboot-binaries.git --branch master-p10',],
 

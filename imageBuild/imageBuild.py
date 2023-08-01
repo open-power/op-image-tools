@@ -318,16 +318,27 @@ def downloadBinaries(output):
                 print(f"ERROR: {cmd} failed with rc {resp.returncode}")
                 sys.exit(resp.returncode)
 
+        # get base commit id
+        cmd = f"git -C {repoName} log --oneline -n 1"
+        resp=subprocess.run(cmd.split(),stdout=subprocess.PIPE)
+        baseCommit = resp.stdout.decode().split()[0]
+        if resp.returncode != 0:
+            os.chdir(cwd)
+            print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+            sys.exit(resp.returncode)
+
         os.chdir(cwd)
         files = config['binaries']['files']
         for file,commit in files:
-            if commit != '':
-                print(f"INFO: Checking out {commit}")
-                cmd = f"git -C {repoPath} checkout {commit}"
-                resp=subprocess.run(cmd.split(),stderr=subprocess.PIPE)
-                if resp.returncode != 0:
-                    print(f"ERROR: {cmd} failed with rc {resp.returncode}")
-                    sys.exit(resp.returncode)
+            if commit == '':
+                commit = baseCommit
+            cmd = f"git -C {repoPath} checkout {commit}"
+            print(f"INFO: {cmd}")
+            resp=subprocess.run(cmd.split(),stderr=subprocess.PIPE)
+            if resp.returncode != 0:
+                print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+                sys.exit(resp.returncode)
+
             srcpath=os.path.join(repoPath,file)
             dstpath=os.path.join(binariesDir,os.path.basename(file))
             cmd = f"cp {srcpath} {dstpath}"

@@ -46,7 +46,6 @@
     'sbeTools'  : 'sbe_tools.tar.gz',
 
     # 'binaries' contains the released binary images (optional), expected to be a git repository
-    # Setup binaries : shell cmd(s) to setup binaries content --depth 1 master-p10 hw072723a.ody sbegold0711_2328.ody
     'binaries'    :  {
         'repository' : ['git clone https://github.com/open-power/hostboot-binaries.git --branch master-p10',],
 
