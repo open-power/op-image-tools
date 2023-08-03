@@ -318,8 +318,9 @@ def downloadBinaries(output):
                 print(f"ERROR: {cmd} failed with rc {resp.returncode}")
                 sys.exit(resp.returncode)
 
+        os.chdir(repoName)
         # get base commit id
-        cmd = f"git -C {repoName} log --oneline -n 1"
+        cmd = f"git log --oneline -n 1"
         resp=subprocess.run(cmd.split(),stdout=subprocess.PIPE)
         baseCommit = resp.stdout.decode().split()[0]
         if resp.returncode != 0:
@@ -327,16 +328,16 @@ def downloadBinaries(output):
             print(f"ERROR: {cmd} failed with rc {resp.returncode}")
             sys.exit(resp.returncode)
 
-        os.chdir(cwd)
         files = config['binaries']['files']
         for file,commit in files:
             if commit == '':
                 commit = baseCommit
-            cmd = f"git -C {repoPath} checkout {commit}"
+            cmd = f"git checkout {commit}"
             print(f"INFO: {cmd}")
             resp=subprocess.run(cmd.split(),stderr=subprocess.PIPE)
             if resp.returncode != 0:
                 print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+                os.chdir(cwd)
                 sys.exit(resp.returncode)
 
             srcpath=os.path.join(repoPath,file)
@@ -345,7 +346,9 @@ def downloadBinaries(output):
             resp=subprocess.run(cmd.split())
             if resp.returncode != 0:
                 print(f"ERROR: {cmd} failed with rc {resp.returncode}")
+                os.chdir(cwd)
                 sys.exit(resp.returncode)
+        os.chdir(cwd)
     else:
         os.makedirs(binariesDir,exist_ok=True)
 

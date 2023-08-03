@@ -62,8 +62,8 @@
 
     # This specifies that the 'golden_image' is to be included within the generated output image.
     # The 'golden_image' is first searched for in the directory specified by --ovrd, if given,
-    # then in the path specified here, lastly in the released binaries directory.
-    #'golden_image' : 'golden_odyssey_nor_DD1.img',
+    # then in the released binaries directory.
+    'golden_image' : 'golden_odyssey_nor_DD1.img.tar.gz',
     # No golden_image for lab ?
     # 'golden_image' : '%sbeImageDir%/odyssey/golden_odyssey_nor_DD1.img.tar.gz',
 
