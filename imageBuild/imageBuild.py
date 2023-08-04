@@ -407,8 +407,8 @@ parser.add_argument('configfile',
                     help="The configuration file used to build the image.")
 parser.add_argument('-b','--build',action='store_true',
                     help='Downloads ekb and sbe repositories (if not found), '
-                    'then checks out branchs and builds them. Note: Requires --ekb and --sbe,'
-                    ' or --build_workdir')
+                    'then checks out branchs and builds them. Note: Requires '
+                    ' --ekb and --sbe, or --build_workdir')
 parser.add_argument('--nobranchchange', action='store_true',
                     help="Don't change the branch when building")
 parser.add_argument('--update', action='store_true',
@@ -484,12 +484,12 @@ if args.ekb and args.ekb_images:
     print("ERROR Can't use --ekb and --ekb_images together.")
     sys.exit(1)
 
-if not args.ekb and not args.ekb_images and not args.ovrd:
-    print("ERROR Needs to specify either --ekb or --ekb_images or --ovrd")
+if not args.ekb and not args.ekb_images and not args.ovrd and not args.build_workdir:
+    print("ERROR Needs to specify either --ekb or --ekb_images or --ovrd or --build_workdir")
     sys.exit(1)
 
-if args.build and not args.ekb:
-    print("ERROR --build requires --ekb")
+if args.build and not args.ekb and not args.build_workdir:
+    print("ERROR --build requires --ekb or --build_workdir")
     sys.exit(1)
 
 ## ekb base
@@ -503,6 +503,8 @@ if ekbBase:
 else:
     if args.ekb_images:
         ekbBase = args.ekb_images
+    elif args.build_workdir:
+        ekbBase = os.path.abspath(os.path.join(args.build_workdir, 'ekb'))
     else:
         ekbBase = args.ovrd
 
