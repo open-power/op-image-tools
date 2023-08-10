@@ -352,6 +352,9 @@ def downloadBinaries(output):
     else:
         os.makedirs(binariesDir,exist_ok=True)
 
+    if os.path.exists(downloads):
+        shutil.rmtree(downloads)
+
     # create binaries map
     binaries = {}
     files = os.listdir(binariesDir)
