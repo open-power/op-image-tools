@@ -578,8 +578,8 @@ if(pakToolsDir):
 else:
     # First, look in sbe tools
     # TODO where under sbeToolsDir will pak tools be?
-    paktoolsDir = os.path.join(sbeToolsDir,'tools')
-if not os.path.exists(os.path.join(paktoolsDir,'paktool')):
+    pakToolsDir = os.path.join(sbeToolsDir,'tools')
+if not os.path.exists(os.path.join(pakToolsDir,'paktool')):
     # Next, look in sbe path
     pakToolsDir = os.path.join(sbeBase,'public','src','import','public',
                                'common','utils','imageProcs','tools')
