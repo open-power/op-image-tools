@@ -34,6 +34,7 @@
 
         #          (File to extract into delivered binaries, branch/commit/tag  to use (empty string to use latest commit)),
         'files' : [('sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz',''),
+                   ('sbe_images/odyssey_dd1_0/golden/ody_sbe_golden_debug.tar.gz',''),
                    ('odyssey.10.sppe.ram.pak','')],
         # Example:
         #'files' : [('sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz','sbegold0711_2328.ody'),
