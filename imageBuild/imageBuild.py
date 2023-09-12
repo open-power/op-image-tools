@@ -31,9 +31,6 @@ def readConfigFile(configFile):
                     (last_tb.tb_frame.f_locals["node"].lineno,
                        last_tb.tb_frame.f_locals["node"].col_offset),file=sys.stderr)
             sys.exit(1)
-    if not 'image_sections' in data.keys():
-        print("Required key 'image_sections' not found in config data",file=sys.stderr)
-        sys.exit(1)
 
     return data
 
@@ -154,13 +151,37 @@ def setupRepository(basePath, commit,remote):
             os.chdir(cwd)
             sys.exit(1)
 
-def buildPartitionTable(partitions):
-    # Write the  partitions file
+def buildPartitionTable():
+    ''' Generate partition table (output/gen/partitions) needed for flashbuild build-image.
+        Generate a binary partition table (output/gen/part.tbl) to be included in an image.
+        Return the path of the generated partition table
+        '''
+    partTable = {}
+    partTable['format-version'] = 2
+    partTable['memories'] = []
+
+    # Convert older config format if needed
+    if 'mem_images' not in config.keys():
+        config['mem_images'] = [{'image_sections':config['image_sections']}]
+
+    # Build partition table
+    for memImage in config['mem_images']:
+        partitions = []
+        sectionInfo = memImage['image_sections']
+        memImageSize = 0
+        for sectionName, info in sectionInfo.items():
+            partitions.append((sectionName, info['partition_size']))
+            memImageSize = memImageSize + info['partition_size']
+        memTable = {}
+        memTable['size'] = memImageSize
+        memTable['partitions'] = partitions
+        partTable['memories'].append(memTable)
+
     partitionsfile = os.path.join(genDir,'partitions')
     with open(partitionsfile,'w') as f:
-        print(partitions, file=f)
+        print(partTable, file=f)
 
-    # Build part.tbl
+    # Build binary part.tbl
     cmd = "%s compile-ptable %s %s/part.tbl" % (
             flashBuildTool,
             partitionsfile,
@@ -168,10 +189,11 @@ def buildPartitionTable(partitions):
     #print(cmd)
     resp = subprocess.run(cmd.split())
     if resp.returncode !=0:
-        print("falshBuildTool failed to build part.table. rc = %d" % resp.returncode)
+        print("flashBuildTool failed to build part.table. rc = %d" % resp.returncode)
         sys.exit(resp.returncode)
 
     return partitionsfile
+
 
 def getDevReadyCommits(repo, commit):
     print("\nRunning ./", repo, " cronus checkout")
@@ -374,6 +396,35 @@ def resolveFile(fpath, replacement_tags, overrides, binaries):
     print(f"INFO: Using {newPath}")
     return newPath
 
+def locateAndMergeArchives(section_info, replacement_tags, overrides, binaries):
+    # Resolve archive paths in image_sections
+    # Merge archives where more than one exists in an image section
+    for sectionName, info in section_info.items():
+        # skip pre-signed archives unless specifically allowed to
+        if 'signed_image' in info.keys() and not args.allowToSign:
+            print(f"INFO: Use configured signed image for '{sectionName}' so no signing...")
+            continue
+
+        archives    = []
+        baseEntries = []
+
+        # Resolve location of archive images
+        for arc in info['archives']:
+
+            arc = resolveFile(arc, replacement_tags, overrides, binaries)
+            archives.append(arc)
+
+        if 'files' in info.keys():
+            for (entryName,entryPath) in info['files']:
+                for key,value in replacement_tags.items():
+                    entryPath = entryPath.replace(key,value)
+                baseEntries.append((entryName,entryPath))
+
+        # merge archives
+        section_info[sectionName]['mergedArchive'] = mergeArchives(sectionName,
+                                                               archives,
+                                                               baseEntries)
+
 
 ############################################################
 # Main - Main - Main - Main - Main - Main - Main - Main
@@ -559,7 +610,6 @@ if(pakToolsDir):
     pakToolsDir = os.path.realpath(os.path.expanduser(pakToolsDir))
 else:
     # First, look in sbe tools
-    # TODO where under sbeToolsDir will pak tools be?
     pakToolsDir = os.path.join(sbeToolsDir,'tools')
 if not os.path.exists(os.path.join(pakToolsDir,'paktool')):
     # Next, look in sbe path
@@ -577,20 +627,6 @@ imageToolDir = os.path.realpath(os.path.expanduser(imageToolDir))
 pakTool         = os.path.join(pakToolsDir, 'paktool')
 flashBuildTool  = os.path.join(pakToolsDir, 'flashbuild')
 
-
-imagefile = os.path.join(output,args.name)
-singleImagefile = imagefile
-concatCopies = 0
-if 'concat' in config.keys():
-    concatCopies = config['concat']
-if concatCopies > 1:
-    singleImagefile = os.path.join(output,"single_" + args.name)
-
-if os.path.exists(imagefile):
-    os.remove(imagefile)
-if os.path.exists(singleImagefile):
-    os.remove(singleImagefile)
-
 genDir = os.path.join(output,'gen')
 if os.path.exists(genDir):
     shutil.rmtree(genDir)
@@ -604,8 +640,6 @@ import pakcore as pak
 
 #only print out critical errors. For debug, change CRITICAL to DEBUG
 out.setConsoleLevel(out.levels.CRITICAL)
-
-section_info = config['image_sections']
 
 #### Build stages
 ####    Note : Below stage will be skipped if section is configured with 'signed_image'
@@ -633,211 +667,214 @@ replacement_tags = {
         '%gen%'         : genDir,
 }
 
-# Discover partitions
-partitions = []
-for sectionName, info in section_info.items():
-    partitions.append((sectionName, info['partition_size']))
+partitionsfile = buildPartitionTable()
+memImageCount = len(config['mem_images'])
 
-# Create partitions file and build partition table
-partitionsfile = buildPartitionTable(partitions)
+for memId,memImage in enumerate(config['mem_images']):
+    section_info = memImage['image_sections']
+    locateAndMergeArchives(section_info,
+                           replacement_tags,
+                           overrides,
+                           binaries)
 
-# Resolve archive paths in image_sections
-# Merge archives where more than one exists in an image section
-for sectionName, info in section_info.items():
-    if 'signed_image' in info.keys() and not args.allowToSign:
-        print(f"INFO: Use configured signed image for '{sectionName}' so no signing...")
-        continue
 
-    archives    = []
-    baseEntries = []
+    # Add signature/hash to sections that require it
+    signImgSrc = {}
+    hashImgSrc = {}
+    asisImgSrc = {}
 
-    # Resolve location of archive images
-    for arc in info['archives']:
+    notHashed = {}
 
-        arc = resolveFile(arc, replacement_tags, overrides, binaries)
-        archives.append(arc)
+    # Hash and sign
+    for sectionName, info in section_info.items():
+        if 'mergedArchive' not in info.keys():
+            # if a 'mergedArchive' key has not been generated for this section
+            # then skip hashing and signing.
+            continue
 
-    if 'files' in info.keys():
-        for (entryName,entryPath) in info['files']:
+        pakname = info['mergedArchive']
+
+        ## Extract and save entries that should not be hashed,
+        ## then remove them from the archive
+        saveArchive = pak.Archive()
+        if 'noHash' in info.keys():
+            saveAndRemove(pakname, saveArchive, info['noHash'])
+
+        if 'hashlist' in info.keys():
+            #----------------------------
+            # Generate hash.list
+            #----------------------------
+            hashpath = info['hashpath']
+            hashlist = info['hashlist']
+
+            # hashname in archive
+            archivefn = os.path.join(hashpath,hashlist)
+
+            # create hash list and add it to the archive
+            makeHashList(pakname, archivefn)
+
+            # Must be signed, so source pak to sign comes from stage1
+            signImgSrc[sectionName] = pakname
+            # Must be hashed, so source pakname to hash comes from stage2
+            hashImgSrc[sectionName] = pakname.replace(stage1,stage2)
+        elif 'imagehash' in info.keys():
+            # Not to be signed, only hashed, so source pakname to hash is from stage1.
+            hashImgSrc[sectionName] = pakname
+
+        else:
+            asisImgSrc[sectionName] = pakname
+
+        # All paks will exist in stage3 - used to build final flash image
+        finalName = pakname.replace(stage1,stage3)
+        section_info[sectionName]['finalArchive'] = finalName
+        notHashed[sectionName] = saveArchive
+
+    if len(signImgSrc.items()) > 0:
+        #----------------------------
+        # Call sbeImageTool signPak
+        #----------------------------
+        # This is ugly ... need support for more than RHEL and don't point to someones user space
+        with subprocess.Popen("lsb_release -sr".split(),stdout=subprocess.PIPE) as proc:
+            osversion = proc.stdout.read().decode()
+        if osversion[0] == '8':
+            os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8/'
+            os.environ['OPEN_SSL_PATH']='/bin/openssl'
+        elif osversion[0] == '7':
+            os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/'
+            os.environ['OPEN_SSL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/openssl-1.1.1n/apps/openssl'
+        else:
+            print("ERROR: Signing is only available for os RHEL7 and RHEL8");
+            sys.exit(1)
+
+        pakFilesToSign = ""
+        for sectionName, pakFile in signImgSrc.items():
+            pakFilesToSign += sectionName + "=" + pakFile + " "
+
+        cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
+                signPak --pakFiles {pakFilesToSign}"
+
+        print(f"INFO: signing: {pakFilesToSign}")
+
+        if os.path.exists(sbeImageTool):
+            resp = subprocess.run(cmd.split())
+            if resp.returncode != 0:
+                print("%s failed with rc %d" % (cmd,resp.returncode))
+                sys.exit(resp.returncode)
+            else:
+                stub_cp(signImgSrc, signedDir)
+
+    #--------------------------------
+    # Call sbeImageTool pakHash
+    #--------------------------------
+    pakFilesToHash = ""
+    for sectionName, pakFile in hashImgSrc.items():
+        pakFilesToHash += sectionName + "=" + pakFile + " "
+
+    cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
+            pakHash --pakFiles {pakFilesToHash}"
+
+    print(f"INFO: hashing: {pakFilesToHash}")
+
+    if os.path.exists(sbeImageTool):
+        resp = subprocess.run(cmd.split())
+        if resp.returncode != 0:
+            print("%s failed with rc %d" % (cmd,resp.returncode))
+            sys.exit(resp.returncode)
+        else:
+            stub_cp(hashImgSrc, finalDir)
+
+    stub_cp(asisImgSrc, finalDir)
+
+    # Use configured 'signed_image' as 'finalArchive' to pack since signing were
+    # skipped for those image sections
+    for sectionName, info  in section_info.items():
+        if 'signed_image' in info.keys() and not args.allowToSign:
+            print(f"INFO: Copy the configured signed image for '{sectionName}' as final image...")
+            signedImgPath = info['signed_image']
             for key,value in replacement_tags.items():
-                entryPath = entryPath.replace(key,value)
-            baseEntries.append((entryName,entryPath))
+                signedImgPath = signedImgPath.replace(key,value)
 
-    # merge archives
-    section_info[sectionName]['mergedArchive'] = mergeArchives(sectionName, archives, baseEntries)
+            finalArchivePath  = os.path.join(finalDir, f"{sectionName}.pak")
+            shutil.copy(signedImgPath, finalArchivePath)
+            section_info[sectionName]['finalArchive'] = finalArchivePath
 
+    # Determine output image name(s)
+    imagefile = args.name
+    singleImagefile = imagefile
 
-# Add signature/hash to sections that require it
-signImgSrc = {}
-hashImgSrc = {}
-asisImgSrc = {}
+    concatCopies = 0
+    if 'concat' in config.keys():
+        concatCopies = config['concat']
+        if concatCopies > 1:
+            singleImagefile = "single_" + singleImagefile
 
-notHashed = {}
+    if memImageCount > 1:
+        singleImagefile = f"mem{memId}_{singleImagefile}"
+        imagefile = f"mem{memId}_{imagefile}"
 
-for sectionName, info in section_info.items():
-    if 'mergedArchive' not in info.keys():
-        continue
+    singleImagefile = os.path.join(output,singleImagefile)
+    imagefile = os.path.join(output,imagefile)
+    if os.path.exists(imagefile):
+        os.remove(imagefile)
+    if os.path.exists(singleImagefile):
+        os.remove(singleImagefile)
 
-    pakname = info['mergedArchive']
+    # Create image
+    cmd = "%s build-image %s %s -m %s" % (flashBuildTool, partitionsfile, singleImagefile,memId)
 
-    ## Extract and save entries that should not be hashed, then remove them from the archive
-    saveArchive = pak.Archive()
-    if 'noHash' in info.keys():
-        saveAndRemove(pakname, saveArchive, info['noHash'])
+    #----------------------------
+    # Restore images not hashed
+    #----------------------------
+    for sectionName, info  in section_info.items():
+        if sectionName in notHashed.keys():
+            archive = notHashed[sectionName]
+            restoreSaved(info['finalArchive'], archive)
 
-    if 'hashlist' in info.keys():
-        #----------------------------
-        # Generate hash.list
-        #----------------------------
-        hashpath = info['hashpath']
-        hashlist = info['hashlist']
-
-        # hashname in archive
-        archivefn = os.path.join(hashpath,hashlist)
-
-        # create hash list and add it to the archive
-        makeHashList(pakname, archivefn)
-
-        # Must be signed, so source pak to sign comes from stage1
-        signImgSrc[sectionName] = pakname
-        # Must be hashed, so source pakname to hash comes from stage2
-        hashImgSrc[sectionName] = pakname.replace(stage1,stage2)
-    elif 'imagehash' in info.keys():
-        # Not to be signed, only hashed, so source pakname to hash is from stage1.
-        hashImgSrc[sectionName] = pakname
-
-    else:
-        asisImgSrc[sectionName] = pakname
-
-    # All paks will exist in stage3 - used to build final flash image
-    finalName = pakname.replace(stage1,stage3)
-    section_info[sectionName]['finalArchive'] = finalName
-    notHashed[sectionName] = saveArchive
-
-#----------------------------
-# Call sbeImageTool signPak
-#----------------------------
-# This is ugly ... need support for more than RHEL and don't point to someones user space
-with subprocess.Popen("lsb_release -sr".split(),stdout=subprocess.PIPE) as proc:
-    osversion = proc.stdout.read().decode()
-if osversion[0] == '8':
-    os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8/'
-    os.environ['OPEN_SSL_PATH']='/bin/openssl'
-elif osversion[0] == '7':
-    os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/'
-    os.environ['OPEN_SSL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/openssl-1.1.1n/apps/openssl'
-else:
-    print("ERROR: Signing is only available for os RHEL7 and RHEL8");
-    sys.exit(1)
-
-pakFilesToSign = ""
-for sectionName, pakFile in signImgSrc.items():
-    pakFilesToSign += sectionName + "=" + pakFile + " "
-
-cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
-        signPak --pakFiles {pakFilesToSign}"
-
-print(f"INFO: signing: {pakFilesToSign}")
-
-if os.path.exists(sbeImageTool):
+        cmd = "%s -p %s=%s" % (cmd, sectionName, info['finalArchive'])
+    #print(cmd)
+    #-------------------------
+    # Create final image
+    #-------------------------
     resp = subprocess.run(cmd.split())
     if resp.returncode != 0:
-        print("%s failed with rc %d" % (cmd,resp.returncode))
+        print("flashbuild failed with rc %d" % resp.returncode)
         sys.exit(resp.returncode)
-    else:
-        stub_cp(signImgSrc, signedDir)
 
-#--------------------------------
-# Call sbeImageTool pakHash
-#--------------------------------
-pakFilesToHash = ""
-for sectionName, pakFile in hashImgSrc.items():
-    pakFilesToHash += sectionName + "=" + pakFile + " "
+    if concatCopies > 1:
+        shutil.copyfile(singleImagefile, imagefile)
 
-cmd = f"{sbeImageTool} --pakToolDir {pakToolsDir} \
-        pakHash --pakFiles {pakFilesToHash}"
+        if args.buildGoldenImg:
+            print(f"INFO: Using the custom golden image for the given "
+                  f"side count [{args.buildGoldenImg}]")
+            concatCopies = args.buildGoldenImg
 
-print(f"INFO: hashing: {pakFilesToHash}")
+        f1 = open(imagefile, 'ab+')
+        for i in range(concatCopies-1):
+            f = open(singleImagefile, 'rb')
+            f1.write(f.read())
+            f.close()
 
-if os.path.exists(sbeImageTool):
+        if 'golden_image' in config.keys() and not args.buildGoldenImg:
+            print("INFO: Using configured golden image to pack in the NOR image")
+            goldenImgPath = config['golden_image']
+
+            goldenImgPath = resolveFile(goldenImgPath, replacement_tags, overrides, binaries)
+
+            goldenImgFd = open(goldenImgPath, 'rb')
+            f1.write(goldenImgFd.read())
+            goldenImgFd.close()
+
+        f1.close()
+
+    #--------------------------
+    # ecc
+    #--------------------------
+    eccImagefile = imagefile+'.ecc'
+    cmd = "%s --inject %s --output %s --p8" % (sbeEccTool,imagefile,eccImagefile)
     resp = subprocess.run(cmd.split())
     if resp.returncode != 0:
-        print("%s failed with rc %d" % (cmd,resp.returncode))
+        print("ecc failed with rc %d" % resp.returncode)
         sys.exit(resp.returncode)
-    else:
-        stub_cp(hashImgSrc, finalDir)
-
-stub_cp(asisImgSrc, finalDir)
-
-# Use configured 'signed_image' as 'finalArchive' to pack since signing were
-# skipped for those image sections
-for sectionName, info  in section_info.items():
-    if 'signed_image' in info.keys() and not args.allowToSign:
-        print(f"INFO: Copy the configured signed image for '{sectionName}' as final image...")
-        signedImgPath = info['signed_image']
-        for key,value in replacement_tags.items():
-            signedImgPath = signedImgPath.replace(key,value)
-
-        finalArchivePath  = os.path.join(finalDir, f"{sectionName}.pak")
-        shutil.copy(signedImgPath, finalArchivePath)
-        section_info[sectionName]['finalArchive'] = finalArchivePath
-
-# Create image
-cmd = "%s build-image %s %s" % (flashBuildTool, partitionsfile, singleImagefile)
-
-#----------------------------
-# Restore images not hashed
-#----------------------------
-for sectionName, info  in section_info.items():
-    if sectionName in notHashed.keys():
-        archive = notHashed[sectionName]
-        restoreSaved(info['finalArchive'], archive)
-
-    cmd = "%s -p %s=%s" % (cmd, sectionName, info['finalArchive'])
-#print(cmd)
-#-------------------------
-# Create final image
-#-------------------------
-resp = subprocess.run(cmd.split())
-if resp.returncode != 0:
-    print("flashbuild failed with rc %d" % resp.returncode)
-    sys.exit(resp.returncode)
-
-if concatCopies > 1:
-    shutil.copyfile(singleImagefile, imagefile)
-
-    if args.buildGoldenImg:
-        print(f"INFO: Using the custom golden image for the given "
-              f"side count [{args.buildGoldenImg}]")
-        concatCopies = args.buildGoldenImg
-
-    f1 = open(imagefile, 'ab+')
-    for i in range(concatCopies-1):
-        f = open(singleImagefile, 'rb')
-        f1.write(f.read())
-        f.close()
-
-    if 'golden_image' in config.keys() and not args.buildGoldenImg:
-        print("INFO: Using configured golden image to pack in the NOR image")
-        goldenImgPath = config['golden_image']
-
-        goldenImgPath = resolveFile(goldenImgPath, replacement_tags, overrides, binaries)
-
-        goldenImgFd = open(goldenImgPath, 'rb')
-        f1.write(goldenImgFd.read())
-        goldenImgFd.close()
-
-    f1.close()
-
-#--------------------------
-# ecc
-#--------------------------
-eccImagefile = imagefile+'.ecc'
-cmd = "%s --inject %s --output %s --p8" % (sbeEccTool,imagefile,eccImagefile)
-resp = subprocess.run(cmd.split())
-if resp.returncode != 0:
-    print("ecc failed with rc %d" % resp.returncode)
-    sys.exit(resp.returncode)
 
 #--------------------------
 # Run SBE test cases
