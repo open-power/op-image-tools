@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-# IBM_PROLOG_BEGIN_TAG
-# This is an automatically generated prolog.
-#
-# $Source: public/common/utils/imageProcs/tools/imageBuild.py $
-#
-# IBM CONFIDENTIAL
-#
-# EKB Project
-#
-# COPYRIGHT 2022
-# [+] International Business Machines Corp.
-#
-#
-# The source code for this program is not published or otherwise
-# divested of its trade secrets, irrespective of what has been
-# deposited with the U.S. Copyright Office.
-#
-# IBM_PROLOG_END_TAG
 import sys
 import os
 import argparse
@@ -119,7 +101,7 @@ def setupRepository(basePath, commit,remote):
                 if resp.returncode != 0:
                     print("git update failed with rc %d" % resp.returncode)
                     os.chdir(cwd)
-                    sys.exit(1) 
+                    sys.exit(1)
             elif 'ekb' in remote:
                 cmd = 'git fetch gerrit'
                 print(cmd)
