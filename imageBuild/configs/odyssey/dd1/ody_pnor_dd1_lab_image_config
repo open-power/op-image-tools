@@ -1,22 +1,5 @@
 #!/usr/bin/env python3
 # this is not a python executable, rather the first line is a hint for text editors
-# IBM_PROLOG_BEGIN_TAG
-# This is an automatically generated prolog.
-#
-# $Source: configs/odyssey/dd1/ody_pnor_dd1_lab_image_config $
-#
-# IBM CONFIDENTIAL
-#
-#
-# COPYRIGHT 2023
-# [+] International Business Machines Corp.
-#
-#
-# The source code for this program is not published or otherwise
-# divested of its trade secrets, irrespective of what has been
-# deposited with the U.S. Copyright Office.
-#
-# IBM_PROLOG_END_TAG
 
 # NOTE: Reqired source files are first searched for in the directory specified
 # by --ovrd, if given, then in the path provided by this configfile  or
