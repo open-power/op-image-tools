@@ -93,7 +93,7 @@
             'hashlist' : 'hash.list',
             # location (dir) inside PAK file for hash and sign files
             'hashpath' : 'rt',
-            'noHash'   : ['info.txt'],
+            'noHash'   : ['info.txt','sbebuildinfo.bin'],
             # Generate a image hash for this section by using sbe imageTool
             'imagehash': 'image.hash',
         },
