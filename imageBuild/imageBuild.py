@@ -829,6 +829,33 @@ if concatCopies > 1:
 
     f1.close()
 
+    # Copy odyssey_nor_DD1.img into odyssey_sbe_debug_DD1.tar.gz
+    archSbeDebugTar = os.path.join(sbeImageDir, "odyssey/odyssey_sbe_debug_DD1.tar.gz")
+    if not os.path.exists(archSbeDebugTar):
+        print(f"{archSbeDebugTar} does not exist", file=sys.stderr)
+        sys.exit(1)
+    else:
+        print("INFO: Untar odyssey_sbe_debug_DD1.tar.gz")
+        archive = tarfile.open(archSbeDebugTar)
+        pathSbeDebugTar = os.path.dirname(os.path.abspath(archSbeDebugTar))
+        archive.extractall(pathSbeDebugTar)
+        archive.close()
+
+        # Remove odyssey_sbe_debug_DD1.tar.gz
+        os.remove(archSbeDebugTar)
+
+        print("INFO: Copy odyssey_nor_DD1.img into extracted odyssey_debug_files_tools")
+        pathSbeDebugTools = os.path.join(pathSbeDebugTar, "odyssey_debug_files_tools")
+        shutil.copy(imagefile, pathSbeDebugTools)
+
+        print("INFO: Archive odyssey_debug_files_tools into tar file odyssey_sbe_debug_DD1.tar.gz")
+        archive = tarfile.open(archSbeDebugTar, "w:gz")
+        archive.add(pathSbeDebugTools, arcname=os.path.basename(pathSbeDebugTools))
+        archive.close()
+
+        # Remove directory odyssey_debug_files_tools
+        shutil.rmtree(pathSbeDebugTools)
+
 #--------------------------
 # ecc
 #--------------------------
