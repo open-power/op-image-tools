@@ -7,6 +7,7 @@ import subprocess
 import ast
 import shutil
 import tarfile
+import inspect
 
 def readConfigFile(configFile):
     with open(configFile, "r") as f:
@@ -391,7 +392,10 @@ def resolveFile(fpath, replacement_tags, overrides, binaries):
         # untar tar -C binaries -xzf binaries/sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz
         tar = tarfile.open(newPath)
         # TODO might want to consider case where newPath is in an unwriteable location
-        tar.extractall(os.path.dirname(newPath))
+        if 'filter' in inspect.signature(tarfile.TarFile.extractall).parameters:
+            tar.extractall(os.path.dirname(newPath),filter="data")
+        else:
+            tar.extractall(os.path.dirname(newPath))
         newPath=newPath[:-len(tgzext)]
     print(f"INFO: Using {newPath}")
     return newPath
@@ -594,7 +598,12 @@ else:
     sbeToolsTar = os.path.join(sbeImageDir, sbeToolsTar)
 
 sbeTools = tarfile.open(sbeToolsTar)
-sbeTools.extractall(output)
+
+if 'filter' in inspect.signature(tarfile.TarFile.extractall).parameters:
+    sbeTools.extractall(output,filter="data")
+else:
+    sbeTools.extractall(output)
+
 sbeToolsDir = os.path.join(output,'sbe_tools')
 sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
 
