@@ -728,18 +728,23 @@ for sectionName, info in section_info.items():
 #----------------------------
 # Call sbeImageTool signPak
 #----------------------------
-# This is ugly ... need support for more than RHEL and don't point to someones user space
-with subprocess.Popen("lsb_release -sr".split(),stdout=subprocess.PIPE) as proc:
-    osversion = proc.stdout.read().decode()
-if osversion[0] == '8':
-    os.environ['SIGNING_RHEL_PATH']='/gsa/ausgsa/home/c/e/cengel/public/signtool/RHEL8/'
+# If running in op-build use the host dir
+if os.environ.get('HOST_DIR'):
+    os.environ['OPBUILD_HOST_DIR'] = os.environ.get('HOST_DIR')
     os.environ['OPEN_SSL_PATH']='/bin/openssl'
-elif osversion[0] == '7':
-    os.environ['SIGNING_RHEL_PATH']='/gsa/ausgsa/home/c/e/cengel/public/signtool/RHEL7/'
-    os.environ['OPEN_SSL_PATH']='/gsa/ausgsa/home/c/e/cengel/public/signtool/RHEL7/openssl-1.1.1n/apps/openssl'
 else:
-    print("ERROR: Signing is only available for os RHEL7 and RHEL8");
-    sys.exit(1)
+    # This is ugly ... need support for more than RHEL and don't point to someones user space
+    with subprocess.Popen("lsb_release -sr".split(),stdout=subprocess.PIPE) as proc:
+        osversion = proc.stdout.read().decode()
+    if osversion[0] == '8':
+        os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8/'
+        os.environ['OPEN_SSL_PATH']='/bin/openssl'
+    elif osversion[0] == '7':
+        os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/'
+        os.environ['OPEN_SSL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/openssl-1.1.1n/apps/openssl'
+    else:
+        print("ERROR: Signing is only available for os RHEL7 and RHEL8");
+        sys.exit(1)
 
 pakFilesToSign = ""
 for sectionName, pakFile in signImgSrc.items():
