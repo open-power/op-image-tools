@@ -871,6 +871,20 @@ if concatCopies > 1:
             pathSbeDebugTools = os.path.join(pathSbeDebugTar, "odyssey_debug_files_tools")
             shutil.copy(imagefile, pathSbeDebugTools)
 
+            # open imagefile to check for info.txt
+            imgArchive = pak.Archive(imagefile)
+            imgArchive.load()
+
+            try:
+                # get the info.txt for runtime
+                data = imgArchive.extract('info.txt')
+                pathInfoTxt = os.path.join(pathSbeDebugTools, "info.txt")
+                outfile = open(pathInfoTxt, 'wb')
+                outfile.write(bytearray(data))
+                outfile.close()
+            except pak.ArchiveError as e:
+               out.print(str(e))
+
             print("INFO: Archive odyssey_debug_files_tools into tar file odyssey_sbe_debug_DD1.tar.gz")
             archive = tarfile.open(archSbeDebugTar, "w:gz")
             archive.add(pathSbeDebugTools, arcname=os.path.basename(pathSbeDebugTools))
