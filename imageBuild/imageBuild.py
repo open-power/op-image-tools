@@ -8,6 +8,7 @@ import ast
 import shutil
 import tarfile
 import inspect
+import platform
 
 def readConfigFile(configFile):
     with open(configFile, "r") as f:
@@ -558,10 +559,13 @@ else:
 sbeToolsDir = os.path.join(output,'sbe_tools')
 sbeImageTool = os.path.join(sbeToolsDir, 'imageTool.py')
 
-sbeEccTool = os.path.join(sbeToolsDir,'ecc')
+ARCH = platform.machine()
+sbeEccTool = os.path.join(sbeToolsDir,'ecc') + '_' + ARCH
 if not os.path.exists(sbeEccTool):
-    print("ERROR: %s does not exist. Make sure SBE is current" % sbeEccTool)
-    sys.exit(1)
+    sbeEccTool = os.path.join(sbeToolsDir,'ecc')
+    if not os.path.exists(sbeEccTool):
+        print("ERROR: %s does not exist. Make sure SBE is current" % sbeEccTool)
+        sys.exit(1)
 
 
 ## pak tools
@@ -737,7 +741,10 @@ else:
     with subprocess.Popen("lsb_release -sr".split(),stdout=subprocess.PIPE) as proc:
         osversion = proc.stdout.read().decode()
     if osversion[0] == '8':
-        os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8/'
+        if os.path.exists('/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8.' + ARCH):
+            os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8.' + ARCH + '/'
+        else:
+            os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8/'
         os.environ['OPEN_SSL_PATH']='/bin/openssl'
     elif osversion[0] == '7':
         os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/'
