@@ -10,6 +10,17 @@ import tarfile
 import inspect
 import platform
 
+
+def checkEnvVarExist(var):
+    if os.environ.get(var) is None:
+        print("Error: env var %s not found" % var)
+        sys.exit(1)
+    elif os.environ.get(var) is '':
+        print("Error: env var %s found but not set" % var)
+        sys.exit(1)
+    else:
+        print("env var %s found with value" % var, os.getenv(var))
+
 def readConfigFile(configFile):
     with open(configFile, "r") as f:
         try:
@@ -737,21 +748,8 @@ if os.environ.get('HOST_DIR'):
     os.environ['OPBUILD_HOST_DIR'] = os.environ.get('HOST_DIR')
     os.environ['OPEN_SSL_PATH']='/bin/openssl'
 else:
-    # This is ugly ... need support for more than RHEL and don't point to someones user space
-    with subprocess.Popen("lsb_release -sr".split(),stdout=subprocess.PIPE) as proc:
-        osversion = proc.stdout.read().decode()
-    if osversion[0] == '8':
-        if os.path.exists('/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8.' + ARCH):
-            os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8.' + ARCH + '/'
-        else:
-            os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL8/'
-        os.environ['OPEN_SSL_PATH']='/bin/openssl'
-    elif osversion[0] == '7':
-        os.environ['SIGNING_RHEL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/'
-        os.environ['OPEN_SSL_PATH']='/gsa/rchgsa/home/c/e/cengel/signtool/RHEL7/openssl-1.1.1n/apps/openssl'
-    else:
-        print("ERROR: Signing is only available for os RHEL7 and RHEL8");
-        sys.exit(1)
+    checkEnvVarExist('SIGNING_RHEL_PATH')
+    checkEnvVarExist('OPEN_SSL_PATH')
 
 pakFilesToSign = ""
 for sectionName, pakFile in signImgSrc.items():
