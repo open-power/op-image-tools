@@ -749,7 +749,8 @@ if os.environ.get('HOST_DIR'):
     os.environ['OPEN_SSL_PATH']='/bin/openssl'
 else:
     checkEnvVarExist('SIGNING_RHEL_PATH')
-    checkEnvVarExist('OPEN_SSL_PATH')
+    if not os.environ.get('OPEN_SSL_PATH'):
+         os.environ['OPEN_SSL_PATH']='/bin/openssl'
 
 pakFilesToSign = ""
 for sectionName, pakFile in signImgSrc.items():
