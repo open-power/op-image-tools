@@ -33,11 +33,11 @@ git push --follow-tags github $BRANCH_NAME
 """
             }
         } catch (e) {
-            throw_error(error: e)
             status = "FAILURE"
+            throw_error(error: e)
         } finally {
             slack.send  channel_name: '#firmware-ci-bots',
-                        message: """/
+                        message: """\
 Publishing open-power/op-image-tools `${status}`
 <${env.BUILD_URL}console|Jenkins console>
 """
