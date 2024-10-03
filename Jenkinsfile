@@ -29,7 +29,7 @@ def merge_action(kwargs=[:]) {
                 sh  label: 'Push GHE to GitHub',
                     script: """#!/bin/bash -e
 git remote add github git@github.com:open-power/op-image-tools.git
-git push --follow-tags github $BRANCH_NAME
+git push --follow-tags github $BRANCH_NAME:refs/heads/$BRANCH_NAME
 """
             }
         } catch (e) {
