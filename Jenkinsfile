@@ -1,13 +1,15 @@
 properties([disableConcurrentBuilds(abortPrevious: true)])
 
-ansiColor('xterm') {
-    timestamps {
-        load_library ebmc_pipelines: 'main'
+timeout('10') { // 10 minutes
+    ansiColor('xterm') {
+        timestamps {
+            load_library ebmc_pipelines: 'main'
 
-        if (env?.CHANGE_ID) {
-            // commit action - currently nothing defined
-        } else {
-            merge_action()
+            if (env?.CHANGE_ID) {
+                // commit action - currently nothing defined
+            } else {
+                merge_action()
+            }
         }
     }
 }
@@ -20,14 +22,11 @@ def merge_action(kwargs=[:]) {
             stage('Publish') {
                 cleanWs()
 
-                // This checks out the branch from the base repository in which
-                // the PR was recently merged.
-                checkout = checkout scm
-
                 // This simply syncs GitHub (public) with the recently merged
                 // changes in the base repository.
                 sh  label: 'Push GHE to GitHub',
                     script: """#!/bin/bash -e
+git clone -b $BRANCH_NAME --single-branch git@github.ibm.com:open-power/op-image-tools.git $WORKSPACE
 git remote add github git@github.com:open-power/op-image-tools.git
 git push --follow-tags github $BRANCH_NAME:refs/heads/$BRANCH_NAME
 """
