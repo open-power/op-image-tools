@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+# this is not a python executable, rather the first line is a hint for text editors
+
+# NOTE: Reqired source files are first searched for in the directory specified
+# by --ovrd, if given, then in the path provided by this configfile  or
+# passed in as parameters, finally in released binaries dir (binaries), if setup
+
+{
+    # 'ekbImageSubDir' is the subdir under ekb repository of the desired pak archives
+    # It is only used when --ekb parameter is given.
+    # Note: %machine_arch% is either X86_64 or ppc64le
+    'ekbImageSubDir' : 'output/images/%machine_arch%/pak/odyssey/10',
+
+    # 'ekbCommit','ekbworkon','ekbBuild are only used when the --build parameter is specified
+    'ekbCommit' : 'main',
+    'ekbWorkon' : './ekb workon',
+    'ekbBuild'  : 'rm -Rf ./output/*\n./ekb build -j 1 odyssey.10.sppe.ram.pak\n',
+
+    # sbeRoot is no longer required. It is used to provide the default path
+    # to the sbe repository when --sbe or --workdir are not provided.
+    # A path to the sbe repository is required for imageBuild.py to function.
+    'sbeRoot'   : '~/sandbox/p11/sbe',
+    # 'sbeCommit','sbeWorkon','sbeBuild' are only used when the --build parameter is specified
+    'sbeCommit' : 'main',
+    'sbeWorkon' : './sbe workon odyssey pnor',
+    'sbeBuild'  : './sbe clean\n./sbe build\n',
+
+    # Name of the sbe Tools tar
+    'sbeTools'  : 'sbe_tools.tar.gz',
+
+    # 'binaries' contains the released binary images (optional), expected to be a git repository
+    'binaries'    :  {
+        'repository' : ['git clone https://github.com/open-power/hostboot-binaries.git --branch master-p10',],
+
+        #          (File to extract into delivered binaries, branch/commit/tag  to use (empty string to use latest commit)),
+        'files' : [('sbe_images/odyssey_dd1_0/golden/v2/golden_odyssey_nor_DD1.img.tar.gz',''),
+                   ('odyssey.10.sppe.ram.pak','')],
+        # Example:
+        #'files' : [('sbe_images/odyssey_dd1_0/golden/golden_odyssey_nor_DD1.img.tar.gz','sbegold0711_2328.ody'),
+        #           ('odyssey.10.sppe.ram.pak','hw072723a.ody')],
+        },
+
+    # Concatinate specified number of generated images to finalImage (Probably pnor only)
+    'concat'  : 2,
+
+    # This specifies that the 'golden_image' is to be included within the generated output image.
+    # The 'golden_image' is first searched for in the directory specified by --ovrd, if given,
+    # then in the path specified here, lastly in the released binaries directory.
+    #'golden_image' : 'golden_odyssey_nor_DD1.img',
+    'golden_image' : '%sbeImageDir%/odyssey/golden_odyssey_nor_DD1.img.tar.gz',
+
+    # Definition of sections
+    'image_sections' : {
+        # output pak name
+        'debug' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/debug.pak'],
+
+            'partition_size' : 0xE0A8, # 56.16 KiB
+        },
+        'boot' : {
+            # If this option is added with image that will get used blindly
+            # to pack as final NOR and updatable image without signing and hashing.
+            'signed_image' : '%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak',
+
+            # Location of archive(s) needed to build this section. Muliple archives are merged
+            'archives' : ['%sbeImageDir%/odyssey/onetime/bldr/odyssey_bldr_DD1.pak'],
+
+            # 'files' is a list of essential archive entries (files). Intended to generate
+            # place holders for content that may not yet exist in the archives that
+            # make up this section.
+            # They are generated with zero data length if content location doesn't exist.
+            # storage method is 'store' (no compression)
+            # (EntryName, content location), ...
+            'files' : [('part.tbl','%gen%/part.tbl')],
+
+            # Size of the partion in the generated image - padded if needed
+            'partition_size' : 0x31F58,   # 199.83 KiB
+            # Generate a hash list called hash.list and add it to this image section and run signimage tool
+            'hashlist' : 'hash.list',
+            # location (subdir) in PAK file for hash and sign files.
+            'hashpath' : 'boot',
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'rt' : {
+            # Location of archive(s) needed to build this section. Muliples are merged.
+            'archives' : ['%sbeImageDir%/odyssey/runtime/sppe/odyssey_sppe_DD1.pak',
+                          '%ekbImageDir%/odyssey.10.sppe.ram.pak'],
+
+            'partition_size' : 0x340000,  # 3.25 MiB
+            # Generate a hash list called hash.list and add it to this image section and run signimage tool
+            'hashlist' : 'hash.list',
+            # location (dir) inside PAK file for hash and sign files
+            'hashpath' : 'rt',
+            'noHash'   : ['info.txt','rt/sbebuildinfo.bin'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'bmc' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/bmc.pak'],
+
+            # 'files' is a list of essential archive entries (files). Intended to generate
+            # place holders for content that may not yet exist in the archives that
+            # make up this section.
+            # They are generated with zero data length if content file doesn't exist.
+            # storage method is 'store' (no compression)
+            # (EntryName, content location), ...
+            'files' : [('bmc/attr.ovrd','EMPTY'),],
+
+            'partition_size' : 0x40000,   # 256 KiB
+            # not signed - don't provide hashlist
+            'noHash' : ['bmc/info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+        'host' : {
+            # Location of archive(s) needed to build this section
+            'archives' : ['%imageToolDir%/defaults/host.pak'],
+
+            'files' : [('host/attr.ovrd','EMPTY'),],
+
+            'partition_size' : 0x40000,   # 256 KiB
+            # not signed - don't specify hashlist
+            'noHash' : ['host/info.txt'],
+            # Generate a image hash for this section by using sbe imageTool
+            'imagehash': 'image.hash',
+        },
+    },
+}
