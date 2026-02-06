@@ -748,7 +748,9 @@ if os.environ.get('HOST_DIR'):
     os.environ['OPBUILD_HOST_DIR'] = os.environ.get('HOST_DIR')
     os.environ['OPEN_SSL_PATH']='/bin/openssl'
 else:
-    checkEnvVarExist('SIGNING_RHEL_PATH')
+    # Checking for env var SIGNING_BASE_DIR as expected to be
+    # already set to work within the secure build env
+    checkEnvVarExist('SIGNING_BASE_DIR')
     if not os.environ.get('OPEN_SSL_PATH'):
          os.environ['OPEN_SSL_PATH']='/bin/openssl'
 
